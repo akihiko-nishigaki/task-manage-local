@@ -6,6 +6,7 @@ interface Props {
   title: string;
   subtitle?: string;
   showViewSwitcher: boolean;
+  showSearch: boolean;
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
   search: string;
@@ -18,6 +19,7 @@ export function TopBar({
   title,
   subtitle,
   showViewSwitcher,
+  showSearch,
   view,
   onViewChange,
   search,
@@ -54,16 +56,18 @@ export function TopBar({
           </div>
         ) : null}
 
-        <div className="search-box">
-          <IconSearch />
-          <input
-            type="search"
-            value={search}
-            placeholder="タスクを検索"
-            aria-label="タスクを検索"
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-        </div>
+        {showSearch ? (
+          <div className="search-box">
+            <IconSearch />
+            <input
+              type="search"
+              value={search}
+              placeholder="タスクを検索"
+              aria-label="タスクを検索"
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </div>
+        ) : null}
 
         <button
           type="button"

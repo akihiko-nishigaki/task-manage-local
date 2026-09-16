@@ -159,6 +159,7 @@ export function App() {
           title={title}
           {...(subtitle ? { subtitle } : {})}
           showViewSwitcher={isTaskRoute && route.name !== 'dashboard'}
+          showSearch={isTaskRoute}
           view={view}
           onViewChange={setView}
           search={search}

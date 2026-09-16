@@ -27,6 +27,9 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId }: Props) {
   const [quickAddText, setQuickAddText] = useState('');
   const quickBusy = useRef(false);
 
+  // 単一プロジェクトのボードではカード上のプロジェクト名は冗長なので隠す
+  const multiProject = useMemo(() => new Set(tasks.map((t) => t.projectId)).size > 1, [tasks]);
+
   const columns = useMemo(() => {
     const map = new Map<TaskStatus, Task[]>();
     for (const s of TASK_STATUSES) map.set(s, []);
@@ -192,7 +195,7 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId }: Props) {
                           </span>
                         ) : null}
                       </div>
-                      {project ? (
+                      {multiProject && project ? (
                         <span className="task-card-project">
                           <span className="color-dot" style={{ background: project.color }} />
                           {project.name}
