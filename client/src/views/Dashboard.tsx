@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react';
-import type { Task, TaskStatus } from '@shared/types';
+import type { Task, TaskPriority, TaskStatus } from '@shared/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
 import { Assignee, PriorityBadge, StatusBadge } from '../components/Badges';
@@ -15,6 +15,42 @@ const DRAG_MIME = 'text/plain';
 
 /** ステータス別ボードに 1 列あたり表示する最大件数（超過分は件数のみ表示）。 */
 const COLUMN_LIMIT = 20;
+
+/** ステータス別ボードの並び順。 */
+type SortMode = 'due' | 'project' | 'priority';
+
+const SORT_LABELS: Record<SortMode, string> = {
+  due: '締切が近い順',
+  project: 'プロジェクト順（締切順）',
+  priority: '優先度が高い順',
+};
+
+const SORT_MODES: SortMode[] = ['due', 'project', 'priority'];
+
+const SORT_KEY = 'taskmanage.dashSort';
+
+function readSortMode(): SortMode {
+  try {
+    const raw = localStorage.getItem(SORT_KEY);
+    return SORT_MODES.includes(raw as SortMode) ? (raw as SortMode) : 'due';
+  } catch {
+    return 'due';
+  }
+}
+
+/** 優先度の強さ（小さいほど高い）。 */
+const PRIORITY_RANK: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+/** 期限なしは常に最後に回す。 */
+const NO_DUE = '9999-99-99';
+
+/** 締切が近い順。同じ締切なら優先度の高い順、さらに同じなら登録順。 */
+function byDue(a: Task, b: Task): number {
+  const ad = a.dueDate ?? NO_DUE;
+  const bd = b.dueDate ?? NO_DUE;
+  if (ad !== bd) return ad < bd ? -1 : 1;
+  return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.id - b.id;
+}
 
 function MiniList({
   tasks,
@@ -77,9 +113,19 @@ function MiniList({
 }
 
 export function Dashboard({ tasks, onOpenTask }: Props) {
-  const { currentUser, memberById, projectById, updateTask } = useStore();
+  const { currentUser, memberById, projectById, projects, updateTask } = useStore();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropStatus, setDropStatus] = useState<TaskStatus | null>(null);
+  const [sortMode, setSortModeState] = useState<SortMode>(() => readSortMode());
+
+  const setSortMode = (mode: SortMode) => {
+    setSortModeState(mode);
+    try {
+      localStorage.setItem(SORT_KEY, mode);
+    } catch {
+      /* 保存できなくても動作に影響はない */
+    }
+  };
 
   const open = useMemo(() => tasks.filter((t) => t.status !== 'done'), [tasks]);
 
@@ -104,16 +150,35 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
     [open, currentUser],
   );
 
-  // ステータス別の列。並び順はカンバンと揃える。
+  // プロジェクトの並び順（サイドバーの表示順に合わせる）。
+  const projectRank = useMemo(() => {
+    const map = new Map<number, number>();
+    projects.forEach((p, i) => map.set(p.id, i));
+    return map;
+  }, [projects]);
+
+  const compare = useMemo(() => {
+    if (sortMode === 'priority') {
+      return (a: Task, b: Task) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || byDue(a, b);
+    }
+    if (sortMode === 'project') {
+      return (a: Task, b: Task) => {
+        const ar = projectRank.get(a.projectId) ?? Number.MAX_SAFE_INTEGER;
+        const br = projectRank.get(b.projectId) ?? Number.MAX_SAFE_INTEGER;
+        return ar - br || byDue(a, b);
+      };
+    }
+    return byDue;
+  }, [sortMode, projectRank]);
+
+  // ステータス別の列。
   const columns = useMemo(() => {
     const map = new Map<TaskStatus, Task[]>();
     for (const s of TASK_STATUSES) map.set(s, []);
     for (const t of tasks) map.get(t.status)?.push(t);
-    for (const s of TASK_STATUSES) {
-      map.get(s)!.sort((a, b) => a.position - b.position || a.id - b.id);
-    }
+    for (const s of TASK_STATUSES) map.get(s)!.sort(compare);
     return map;
-  }, [tasks]);
+  }, [tasks, compare]);
 
   const startDrag = (e: DragEvent<HTMLElement>, task: Task) => {
     setDragId(task.id);
@@ -224,6 +289,20 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
           </span>
           <h2>ステータス別</h2>
           <span className="muted head-hint">カードをドラッグするとステータスを変更できます</span>
+          <label className="head-sort">
+            <span className="muted">並び順</span>
+            <select
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+              aria-label="ステータス別ボードの並び順"
+            >
+              {SORT_MODES.map((m) => (
+                <option key={m} value={m}>
+                  {SORT_LABELS[m]}
+                </option>
+              ))}
+            </select>
+          </label>
           <span className="card-count">{tasks.length}</span>
         </header>
 
