@@ -1,0 +1,66 @@
+# タグ v* を push すると、ビルド・テストを行い zip を GitHub Release に添付する。
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'リリース対象のタグ（例: v0.1.0）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run check:offline
+
+      - name: zip を作成
+        run: |
+          zip -qr task-manage-local.zip . \
+            -x ".git/*" ".github/*" "node_modules/*" "*/node_modules/*" "data/*" "*.db"
+          ls -la task-manage-local.zip
+
+      - name: Release を作成して zip を添付
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          cat > notes.md <<'MD'
+          社内利用専用・外部送信なしのタスク管理ツールです。
+
+          ## 使い方
+          ```bash
+          unzip task-manage-local.zip -d task-manage-local
+          cd task-manage-local
+          npm install   # 依存取得（この時だけネット接続が必要）
+          npm start     # http://127.0.0.1:3000
+          ```
+          LAN 共有時は `HOST=0.0.0.0 npm start`。詳細は README.md を参照してください。
+
+          zip にはソースとビルド済み成果物（client/dist, server/dist）が含まれます（node_modules は除外）。
+          MD
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" task-manage-local.zip --clobber
+          else
+            gh release create "$TAG" task-manage-local.zip \
+              --title "$TAG 社内タスク管理ツール（ローカル完結版）" \
+              --notes-file notes.md
+          fi
