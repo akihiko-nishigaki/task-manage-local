@@ -1,0 +1,22 @@
+{
+  "name": "task-manage-local",
+  "version": "0.1.0",
+  "private": true,
+  "description": "社内向けローカル完結タスク管理ツール（外部送信なし）",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build -w client && npm run build -w server",
+    "start": "npm run start -w server",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check:offline": "node scripts/check-offline.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
