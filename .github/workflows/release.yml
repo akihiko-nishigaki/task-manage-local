@@ -18,9 +18,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # 手動実行時は実行対象ブランチの先頭を使い、リリース作成時にタグも作成する
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -61,6 +60,7 @@ jobs:
             gh release upload "$TAG" task-manage-local.zip --clobber
           else
             gh release create "$TAG" task-manage-local.zip \
+              --target "$GITHUB_SHA" \
               --title "$TAG 社内タスク管理ツール（ローカル完結版）" \
               --notes-file notes.md
           fi
