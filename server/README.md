@@ -9,7 +9,12 @@
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` | 待受アドレス。LAN 内で共有する場合のみ `0.0.0.0` を指定する |
 | `PORT` | `3000` | 待受ポート |
-| `DATA_DIR` | `<リポジトリ>/data` | SQLite ファイル `tasks.db` を置くディレクトリ（無ければ自動作成）。相対パスはカレントディレクトリ基準 |
+| `DATA_DIR` | OS のユーザーデータ領域（下記） | SQLite ファイル `tasks.db` を置くディレクトリ（無ければ自動作成）。相対パスはカレントディレクトリ基準 |
+
+既定の保存先は `src/dataDir.ts` で決める。Windows は `%LOCALAPPDATA%	ask-manage-local\data`、
+macOS は `~/Library/Application Support/task-manage-local/data`、それ以外は `$XDG_DATA_HOME` または `~/.local/share` 配下。
+`DATA_DIR` 未指定のときだけ、旧保存先 `<リポジトリ>/data/tasks.db` があり新保存先に DB が無ければ起動時にコピーして引き継ぐ
+（旧ファイルは残し `MOVED.txt` を置く）。起動時に stderr へ `[data] <DB のパス>` を 1 行出す。
 
 DB は WAL モード・外部キー制約 ON で開く。バックアップは `data/tasks.db*` のコピー、
 または `GET /api/export` の JSON をローカル保存する。
@@ -41,6 +46,7 @@ npm run typecheck -w server  # 型検査のみ
 
 エンドポイントは `docs/PLAN.md` §5、レスポンスの型は `shared/types.ts` を正とする。補足:
 
+- `GET /api/health` は `{ ok, version, dataDir }`（`dataDir` は起動オプションで渡された場合のみ）。
 - 作成は `201`、削除は `204`（本文なし）。エラーは `{ error: { code, message } }`。
   `code` は `validation`（400）/ `not_found`（404）/ `conflict`（409、タグ名重複）/
   `payload_too_large`（413）/ `internal`（500）。

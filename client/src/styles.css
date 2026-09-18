@@ -1811,3 +1811,16 @@ textarea {
 .cell-actions .btn {
   margin-right: 4px;
 }
+
+.data-dir {
+  margin-top: 12px;
+}
+
+.data-dir code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--surface-2);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+}

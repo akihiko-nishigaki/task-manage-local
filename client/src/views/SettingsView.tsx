@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ExportData } from '@shared/types';
+import { api } from '../api';
 import { useStore } from '../store';
 import { ConfirmDialog } from '../components/Modal';
 import { IconDownload, IconLock, IconUpload } from '../components/Icons';
@@ -16,6 +17,20 @@ export function SettingsView() {
   const [pending, setPending] = useState<{ data: ExportData; fileName: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [dataDir, setDataDir] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .health()
+      .then((h) => {
+        if (!cancelled) setDataDir(h.dataDir ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const doExport = async () => {
     setBusy(true);
@@ -80,6 +95,13 @@ export function SettingsView() {
             <span className="stat-num">{tags.length}</span>タグ
           </li>
         </ul>
+        {dataDir ? (
+          <p className="note data-dir">
+            保存先: <code>{dataDir}</code>
+            <br />
+            アプリのフォルダを入れ替えてもデータはこの場所に残ります。バックアップはサーバー停止後にこのフォルダをコピーしてください。
+          </p>
+        ) : null}
       </section>
 
       <section className="panel">

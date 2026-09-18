@@ -10,7 +10,7 @@
 
 | 項目 | 方針 |
 | --- | --- |
-| データ保存 | ローカルの SQLite ファイル 1 個（`data/tasks.db`）。クラウド DB・外部ストレージは使わない |
+| データ保存 | ローカルの SQLite ファイル 1 個。OS のユーザーデータ領域（Windows: `%LOCALAPPDATA%	ask-manage-local\data`）に置き、アプリのフォルダを入れ替えても残る。クラウド DB・外部ストレージは使わない |
 | 外部通信 | サーバー・クライアントとも外部 API / CDN / フォント / アナリティクス / テレメトリを一切参照しない |
 | 依存パッケージ | Node.js 標準の `node:sqlite` を使い、ネイティブビルドや実行時ダウンロードを不要にする |
 | 配信 | フロントエンドはビルド済み静的ファイルをローカルサーバーが同梱配信（CDN 不使用） |
@@ -47,7 +47,7 @@
 
 | メソッド | パス | 内容 |
 | --- | --- | --- |
-| GET | `/api/health` | `{ ok: true, version }` |
+| GET | `/api/health` | `{ ok: true, version, dataDir }` |
 | GET/POST | `/api/members` | 一覧 / 作成 `{ name }` |
 | PATCH/DELETE | `/api/members/:id` | 更新 `{ name?, active? }` / 削除（担当タスクは担当なしに） |
 | GET/POST | `/api/projects` | 一覧（`?includeArchived=1`）/ 作成 `{ name, description?, color? }` |

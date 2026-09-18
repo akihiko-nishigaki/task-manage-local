@@ -127,7 +127,7 @@ async function request<T>(
 }
 
 export const api = {
-  health: () => request<{ ok: boolean; version: string }>('GET', '/health'),
+  health: () => request<{ ok: boolean; version: string; dataDir?: string }>('GET', '/health'),
 
   // --- メンバー ---
   listMembers: async (): Promise<Member[]> =>

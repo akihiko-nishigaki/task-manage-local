@@ -12,13 +12,15 @@ import { tagsRouter } from './routes/tags.js';
 import { tasksRouter } from './routes/tasks.js';
 import { transferRouter } from './routes/transfer.js';
 
-export const APP_VERSION = '0.2.0';
+export const APP_VERSION = '0.2.1';
 
 const BUILD_HINT = 'クライアントが未ビルドです。npm run build を実行してから再度アクセスしてください。\n';
 
 export interface AppOptions {
   /** ビルド済みクライアント（client/dist）のパス。存在しない場合は案内文を返す。 */
   clientDist?: string | undefined;
+  /** データ保存先。/api/health で返し、設定画面に表示する。 */
+  dataDir?: string | undefined;
 }
 
 /** 外部リソースを読み込ませないためのヘッダー。全レスポンスに付与する。 */
@@ -69,7 +71,7 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
 
   const api = express.Router();
   api.get('/health', (_req, res) => {
-    res.json({ ok: true, version: APP_VERSION });
+    res.json({ ok: true, version: APP_VERSION, ...(options.dataDir ? { dataDir: options.dataDir } : {}) });
   });
   api.use(membersRouter(db));
   api.use(projectsRouter(db));

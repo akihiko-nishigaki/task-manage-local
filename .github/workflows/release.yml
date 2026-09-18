@@ -55,6 +55,11 @@ jobs:
           LAN 共有時は `HOST=0.0.0.0 npm start`。詳細は README.md を参照してください。
 
           zip にはソースとビルド済み成果物（client/dist, server/dist）が含まれます（node_modules は除外）。
+
+          ## データの保存場所
+          データは OS のユーザーデータ領域（Windows: `%LOCALAPPDATA%	ask-manage-local\data`）に保存され、
+          zip を別フォルダに展開し直しても引き継がれます。v0.2.0 以前のフォルダ直下 `data/` にある DB は
+          初回起動時に自動でコピーされます（別フォルダに展開した場合は旧 `data` を新フォルダ直下へコピーしてから起動）。
           MD
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" task-manage-local.zip --clobber
