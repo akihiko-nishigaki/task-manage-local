@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import type {
+  ArchiveTasksInput,
   Comment,
   CreateCommentInput,
   CreateProjectInput,
@@ -89,6 +90,10 @@ interface StoreValue {
   updateTask: (id: number, input: UpdateTaskInput) => Promise<void>;
   deleteTask: (id: number) => Promise<void>;
   reorderTasks: (items: { id: number; status: Task['status']; position: number }[]) => Promise<void>;
+  /** 完了タスクをアーカイブして一覧から外す。戻り値はアーカイブした件数（失敗時 null）。 */
+  archiveTasks: (input: ArchiveTasksInput) => Promise<number | null>;
+  /** アーカイブを解除して一覧へ戻す。戻り値は戻したタスク（失敗時 null）。 */
+  unarchiveTasks: (ids: number[]) => Promise<Task[] | null>;
 
   loadTaskDetail: (id: number) => Promise<TaskDetail | null>;
   addComment: (taskId: number, input: CreateCommentInput) => Promise<Comment | null>;
@@ -422,6 +427,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [tasks, reportError],
   );
 
+  const archiveTasks = useCallback(
+    async (input: ArchiveTasksInput) => {
+      try {
+        const result = await api.archiveTasks(input);
+        const archivedIds = new Set(result.tasks.map((t) => t.id));
+        setTasks((prev) => prev.filter((t) => !archivedIds.has(t.id)));
+        void api.listProjects(true).then(setProjects).catch(() => undefined);
+        pushToast(
+          result.count > 0 ? 'success' : 'info',
+          result.count > 0 ? `${result.count} 件の完了タスクをアーカイブしました。` : 'アーカイブ対象の完了タスクはありません。',
+        );
+        return result.count;
+      } catch (err) {
+        reportError(err, 'アーカイブに失敗しました。');
+        return null;
+      }
+    },
+    [pushToast, reportError],
+  );
+
+  const unarchiveTasks = useCallback(
+    async (ids: number[]) => {
+      try {
+        const result = await api.unarchiveTasks(ids);
+        const restoredIds = new Set(result.tasks.map((t) => t.id));
+        setTasks((prev) => [...prev.filter((t) => !restoredIds.has(t.id)), ...result.tasks]);
+        void api.listProjects(true).then(setProjects).catch(() => undefined);
+        pushToast('success', `${result.count} 件のタスクを一覧に戻しました。`);
+        return result.tasks;
+      } catch (err) {
+        reportError(err, 'アーカイブの解除に失敗しました。');
+        return null;
+      }
+    },
+    [pushToast, reportError],
+  );
+
   const loadTaskDetail = useCallback(
     async (id: number) => {
       try {
@@ -519,6 +561,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateTask,
     deleteTask,
     reorderTasks,
+    archiveTasks,
+    unarchiveTasks,
     loadTaskDetail,
     addComment,
     deleteComment,

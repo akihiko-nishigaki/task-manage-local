@@ -1744,3 +1744,70 @@ textarea {
     display: none;
   }
 }
+
+/* ---------- アーカイブ ---------- */
+
+.btn-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kanban-head-action {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+}
+
+.archive-note {
+  margin-bottom: 12px;
+}
+
+.filter-search {
+  min-width: 180px;
+}
+
+.archive-table {
+  min-width: 960px;
+}
+
+.archive-row .cell-title {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.cell-desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 360px;
+}
+
+.cell-time {
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.cell-actions .btn {
+  margin-right: 4px;
+}

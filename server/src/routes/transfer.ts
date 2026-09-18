@@ -175,11 +175,11 @@ export function transferRouter(db: Db): Router {
       const insertTask = db.prepare(
         mode === 'replace'
           ? `INSERT INTO tasks (id, project_id, title, description, status, priority, assignee_id,
-               due_date, position, created_at, updated_at, completed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+               due_date, position, created_at, updated_at, completed_at, archived_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           : `INSERT INTO tasks (project_id, title, description, status, priority, assignee_id,
-               due_date, position, created_at, updated_at, completed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               due_date, position, created_at, updated_at, completed_at, archived_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       const insertTaskTag = db.prepare('INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?, ?)');
       for (const record of tasks) {
@@ -201,6 +201,10 @@ export function transferRouter(db: Db): Router {
               ? completedAtRaw
               : now
             : null;
+        // アーカイブは完了タスクにのみ有効。古いエクスポート（項目なし）は未アーカイブ扱い
+        const archivedAtRaw = record['archivedAt'];
+        const archivedAt =
+          status === 'done' && typeof archivedAtRaw === 'string' && archivedAtRaw !== '' ? archivedAtRaw : null;
         const values = [
           projectId,
           requireName(record['title'], 'tasks[].title'),
@@ -213,6 +217,7 @@ export function transferRouter(db: Db): Router {
           optIso(record, 'createdAt', now),
           optIso(record, 'updatedAt', now),
           completedAt,
+          archivedAt,
         ] as const;
         const info = mode === 'replace' ? insertTask.run(oldId, ...values) : insertTask.run(...values);
         const newTaskId = mode === 'replace' ? oldId : Number(info.lastInsertRowid);

@@ -47,6 +47,13 @@ npm run typecheck -w server  # 型検査のみ
 - `GET /api/tasks` の並び順はステータス（未着手→進行中→レビュー→完了）→ `position` → `id`。
   `q` はタイトルと説明の部分一致（大文字小文字を区別しない）。`includeDone` は既定 `true` で、
   `0` / `false` のときだけ完了タスクを除外する。`dueBefore` / `dueAfter` は境界を含む。
+  アーカイブ済み（`archivedAt` が非 null）は既定で除外し、`includeArchived=1` で含める、
+  `archivedOnly=1` でアーカイブ済みのみ返す。
+- `POST /api/tasks/archive` は完了タスクの一括アーカイブ。`{ ids }` を渡すとその id のみ
+  （完了以外が混ざると 400 で全体をロールバック）、省略時は `{ projectId?, completedBefore? }` に
+  合致する完了タスクすべて。削除はせず `archivedAt` を付けるだけ。応答は `{ count, tasks }`。
+- `POST /api/tasks/unarchive` は `{ ids }` のアーカイブ解除（ステータスは完了のまま）。
+  `PATCH` / `reorder` で完了以外のステータスへ戻した場合も自動でアーカイブ解除される。
 - `POST /api/tasks` の `position` は同一プロジェクト・同一ステータス内の最大値 + 1。
   ステータスが `done` になると `completedAt` が入り、`done` から外れると `null` に戻る。
 - `POST /api/tasks/reorder` は 1 トランザクションで更新し、更新後のタスク配列を返す。

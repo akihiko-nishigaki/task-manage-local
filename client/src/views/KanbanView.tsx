@@ -3,13 +3,15 @@ import type { Task, TaskStatus } from '@shared/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
 import { Assignee, PriorityBadge, TagChip } from '../components/Badges';
-import { IconPlus } from '../components/Icons';
+import { IconArchive, IconPlus } from '../components/Icons';
 import { formatDueShort, isOverdue, isToday } from '../utils/date';
 
 interface Props {
   tasks: Task[];
   onOpenTask: (id: number) => void;
   quickAddProjectId: number | null;
+  /** 完了列のヘッダーから一括アーカイブを呼び出す */
+  onArchiveDone?: () => void;
 }
 
 interface DropTarget {
@@ -19,7 +21,7 @@ interface DropTarget {
 
 const DRAG_MIME = 'text/plain';
 
-export function KanbanView({ tasks, onOpenTask, quickAddProjectId }: Props) {
+export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone }: Props) {
   const { memberById, tagById, reorderTasks, createTask, projectById } = useStore();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
@@ -144,6 +146,17 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId }: Props) {
               <span className={`col-dot col-${status}`} aria-hidden="true" />
               <h2>{STATUS_LABELS[status]}</h2>
               <span className="kanban-count">{items.length}</span>
+              {status === 'done' && onArchiveDone && items.length > 0 ? (
+                <button
+                  type="button"
+                  className="icon-btn kanban-head-action"
+                  onClick={onArchiveDone}
+                  aria-label="完了タスクをまとめてアーカイブ"
+                  title="完了タスクをまとめてアーカイブ"
+                >
+                  <IconArchive width={15} height={15} />
+                </button>
+              ) : null}
             </header>
 
             <div className="kanban-cards">

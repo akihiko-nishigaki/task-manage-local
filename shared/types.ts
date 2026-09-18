@@ -68,6 +68,7 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  archivedAt: string | null; // アーカイブ済みなら ISO 8601、未アーカイブなら null
 }
 
 export interface TaskDetail extends Task {
@@ -84,6 +85,10 @@ export interface TaskListQuery {
   dueBefore?: string;
   dueAfter?: string;
   includeDone?: boolean;
+  /** true でアーカイブ済みタスクも含める（既定 false） */
+  includeArchived?: boolean;
+  /** true でアーカイブ済みタスクのみ返す */
+  archivedOnly?: boolean;
 }
 
 export interface CreateMemberInput { name: string }
@@ -120,6 +125,27 @@ export interface UpdateTaskInput {
 
 export interface ReorderInput {
   items: { id: number; status: TaskStatus; position: number }[];
+}
+
+/**
+ * 完了タスクの一括アーカイブ。
+ * - `ids` を指定するとその id のみ（すべて完了済みである必要がある）
+ * - 省略時は `projectId` / `completedBefore` に合致する完了タスクすべて
+ */
+export interface ArchiveTasksInput {
+  ids?: number[];
+  projectId?: number;
+  /** この日時（ISO 8601）以前に完了したものだけ対象にする */
+  completedBefore?: string;
+}
+
+export interface UnarchiveTasksInput {
+  ids: number[];
+}
+
+export interface ArchiveResult {
+  count: number;
+  tasks: Task[];
 }
 
 export interface CreateCommentInput { body: string; authorId?: number | null }

@@ -1,11 +1,19 @@
 // /api/tasks
 import { Router } from 'express';
 import type { SQLInputValue } from 'node:sqlite';
-import type { Task, TaskDetail, TaskStatus } from '../../../shared/types.js';
+import type { ArchiveResult, Task, TaskDetail, TaskStatus } from '../../../shared/types.js';
 import type { Db } from '../db.js';
 import { tx } from '../db.js';
 import { notFoundError, validationError } from '../errors.js';
-import { ensureMember, ensureProject, ensureTags, setTaskTags, tagIdsByTask, tagIdsForTask } from '../repo.js';
+import {
+  ensureMember,
+  ensureProject,
+  ensureTags,
+  ensureTask,
+  setTaskTags,
+  tagIdsByTask,
+  tagIdsForTask,
+} from '../repo.js';
 import { nowIso, toComment, toTask } from '../rows.js';
 import type { Row } from '../rows.js';
 import {
@@ -18,6 +26,7 @@ import {
   requireDate,
   requireId,
   requireIdArray,
+  requireIsoDateTime,
   requireName,
   requireNullableDate,
   requireNullableId,
@@ -62,6 +71,12 @@ function requireTask(db: Db, id: number): Task {
 function completedAtFor(previous: TaskStatus, next: TaskStatus, current: string | null, now: string): string | null {
   if (next === 'done') return previous === 'done' && current !== null ? current : now;
   return null;
+}
+
+/** 行が読み込めたタスク一覧を JSON 形へ変換する（タグはまとめて 1 クエリ）。 */
+function toTasks(db: Db, rows: Row[]): Task[] {
+  const tagMap = tagIdsByTask(db, rows.map((row) => Number(row['id'])));
+  return rows.map((row) => toTask(row, tagMap.get(Number(row['id'])) ?? []));
 }
 
 export function tasksRouter(db: Db): Router {
@@ -115,13 +130,80 @@ export function tasksRouter(db: Db): Router {
     if (!queryBoolean(req.query['includeDone'], true)) {
       where.push(`status <> 'done'`);
     }
+    // アーカイブ済みは既定で除外。archivedOnly=1 でアーカイブ済みのみ、includeArchived=1 で両方
+    if (queryBoolean(req.query['archivedOnly'], false)) {
+      where.push('archived_at IS NOT NULL');
+    } else if (!queryBoolean(req.query['includeArchived'], false)) {
+      where.push('archived_at IS NULL');
+    }
 
     const sql = `SELECT * FROM tasks
       ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY ${STATUS_ORDER}, position, id`;
     const rows = db.prepare(sql).all(...params) as Row[];
-    const tagMap = tagIdsByTask(db, rows.map((row) => Number(row['id'])));
-    res.json(rows.map((row) => toTask(row, tagMap.get(Number(row['id'])) ?? [])));
+    res.json(toTasks(db, rows));
+  });
+
+  // 完了タスクの一括アーカイブ。削除はせず archived_at を付けて一覧から隠す。
+  router.post('/tasks/archive', (req, res) => {
+    const body = asObject(req.body);
+    const now = nowIso();
+
+    const result = tx(db, (): ArchiveResult => {
+      let targets: Row[];
+      if (has(body, 'ids')) {
+        const ids = requireIdArray(body['ids'], 'ids');
+        targets = [];
+        for (const id of ids) {
+          const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Row | undefined;
+          if (!row) throw notFoundError(`タスク id=${id} が見つかりません`);
+          if (String(row['status']) !== 'done') {
+            throw validationError(`タスク id=${id} は完了していないためアーカイブできません`);
+          }
+          if (row['archived_at'] === null || row['archived_at'] === undefined) targets.push(row);
+        }
+      } else {
+        const where = [`status = 'done'`, 'archived_at IS NULL'];
+        const params: SQLInputValue[] = [];
+        if (has(body, 'projectId')) {
+          const projectId = requireId(body['projectId'], 'projectId');
+          ensureProject(db, projectId);
+          where.push('project_id = ?');
+          params.push(projectId);
+        }
+        if (has(body, 'completedBefore')) {
+          where.push('completed_at IS NOT NULL AND completed_at <= ?');
+          params.push(requireIsoDateTime(body['completedBefore'], 'completedBefore'));
+        }
+        targets = db
+          .prepare(`SELECT * FROM tasks WHERE ${where.join(' AND ')} ORDER BY id`)
+          .all(...params) as Row[];
+      }
+
+      const update = db.prepare('UPDATE tasks SET archived_at = ?, updated_at = ? WHERE id = ?');
+      for (const row of targets) update.run(now, now, Number(row['id']));
+      const ids = targets.map((row) => Number(row['id']));
+      const tasks = ids.map((id) => requireTask(db, id));
+      return { count: tasks.length, tasks };
+    });
+    res.json(result);
+  });
+
+  // アーカイブ解除。ステータスは変えない（完了のまま一覧へ戻る）。
+  router.post('/tasks/unarchive', (req, res) => {
+    const body = asObject(req.body);
+    const ids = requireIdArray(body['ids'], 'ids');
+    const now = nowIso();
+    const result = tx(db, (): ArchiveResult => {
+      const update = db.prepare('UPDATE tasks SET archived_at = NULL, updated_at = ? WHERE id = ?');
+      for (const id of ids) {
+        ensureTask(db, id);
+        update.run(now, id);
+      }
+      const tasks = ids.map((id) => requireTask(db, id));
+      return { count: tasks.length, tasks };
+    });
+    res.json(result);
   });
 
   router.post('/tasks/reorder', (req, res) => {
@@ -150,9 +232,11 @@ export function tasksRouter(db: Db): Router {
           row['completed_at'] === null || row['completed_at'] === undefined ? null : String(row['completed_at']),
           now,
         );
+        // アーカイブ済みのタスクが完了以外へ戻されたらアーカイブも解除する
+        const archivedAt = item.status === 'done' ? row['archived_at'] ?? null : null;
         db.prepare(
-          'UPDATE tasks SET status = ?, position = ?, completed_at = ?, updated_at = ? WHERE id = ?',
-        ).run(item.status, item.position, completedAt, now, item.id);
+          'UPDATE tasks SET status = ?, position = ?, completed_at = ?, archived_at = ?, updated_at = ? WHERE id = ?',
+        ).run(item.status, item.position, completedAt, archivedAt, now, item.id);
         out.push(requireTask(db, item.id));
       }
       return out;
@@ -249,6 +333,8 @@ export function tasksRouter(db: Db): Router {
     if (status !== current.status) {
       push('status = ?', status);
       push('completed_at = ?', completedAtFor(current.status, status, current.completedAt, now));
+      // 完了以外へ戻したらアーカイブも解除する（一覧に再表示される）
+      if (status !== 'done' && current.archivedAt !== null) push('archived_at = ?', null);
     }
     if (has(body, 'position')) {
       push('position = ?', requireNumber(body['position'], 'position'));

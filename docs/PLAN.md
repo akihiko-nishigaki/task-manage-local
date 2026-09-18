@@ -32,6 +32,7 @@
 2. タスク CRUD（タイトル / 説明 / ステータス / 優先度 / 担当者 / 期限 / タグ / 並び順）
 3. ビュー: リスト（ソート・フィルタ・検索）、カンバン（ドラッグ&ドロップで列間移動と並べ替え）
 4. タスク詳細（編集・コメント・完了）
+   - 完了タスクの一括アーカイブ（一覧から隠すだけで削除しない。専用画面から復帰・完全削除）
 5. メンバー管理（名前のみ。ログイン無し。LAN 内の信頼前提）
 6. タグ管理
 7. ダッシュボード（自分の担当 / 期限超過 / 今週期限）
@@ -53,12 +54,14 @@
 | PATCH/DELETE | `/api/projects/:id` | 更新 `{ name?, description?, color?, archived? }` / 削除（配下タスクごと） |
 | GET/POST | `/api/tags` | 一覧 / 作成 `{ name, color? }` |
 | PATCH/DELETE | `/api/tags/:id` | 更新 / 削除 |
-| GET | `/api/tasks` | 一覧。クエリ: `projectId, status, assigneeId, tagId, priority, q, dueBefore, dueAfter, includeDone` |
+| GET | `/api/tasks` | 一覧。クエリ: `projectId, status, assigneeId, tagId, priority, q, dueBefore, dueAfter, includeDone, includeArchived, archivedOnly` |
 | POST | `/api/tasks` | 作成 `{ projectId, title, description?, status?, priority?, assigneeId?, dueDate?, tagIds? }` |
 | GET | `/api/tasks/:id` | 詳細（`comments` 付き） |
 | PATCH | `/api/tasks/:id` | 部分更新（`tagIds` 含む） |
 | DELETE | `/api/tasks/:id` | 削除 |
 | POST | `/api/tasks/reorder` | `{ items: [{ id, status, position }] }` カンバン並べ替え |
+| POST | `/api/tasks/archive` | 完了タスクの一括アーカイブ `{ ids? } \| { projectId?, completedBefore? }` |
+| POST | `/api/tasks/unarchive` | アーカイブ解除 `{ ids }` |
 | POST | `/api/tasks/:id/comments` | `{ body, authorId? }` |
 | DELETE | `/api/comments/:id` | コメント削除 |
 | GET | `/api/export` | 全データ JSON |
@@ -71,7 +74,7 @@
 - `members(id, name, active, created_at)`
 - `projects(id, name, description, color, archived, created_at, updated_at)`
 - `tags(id, name UNIQUE, color)`
-- `tasks(id, project_id FK, title, description, status, priority, assignee_id FK NULL, due_date, position, created_at, updated_at, completed_at)`
+- `tasks(id, project_id FK, title, description, status, priority, assignee_id FK NULL, due_date, position, created_at, updated_at, completed_at, archived_at)`
 - `task_tags(task_id, tag_id)`
 - `comments(id, task_id FK, author_id FK NULL, body, created_at)`
 - `schema_migrations(version)`
