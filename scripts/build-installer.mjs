@@ -2,10 +2,11 @@
 // 出力: dist-installer/TaskManage-Setup-v<version>.zip
 // サーバーは 1 ファイルにバンドルするため、配布物に node_modules は含まれない。
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
+import { createZip } from './lib/zipwriter.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const templates = path.join(root, 'installer', 'templates');
@@ -13,7 +14,13 @@ const outRoot = path.join(root, 'dist-installer');
 const version = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 const stageName = `TaskManage-Setup-v${version}`;
 const stage = path.join(outRoot, stageName);
-const appDir = path.join(stage, 'app');
+// アプリ本体は 1 つの zip にまとめる。配布 zip の一番上の階層をフォルダ無しにして、
+// エクスプローラーで「インストール」が先頭に並ぶようにするため。
+const payloadDir = path.join(outRoot, '.payload');
+const appDir = payloadDir;
+const PAYLOAD_NAME = '3_program.zip';
+const INSTALLER_NAME = '1_インストール.bat';
+const READ_ME_NAME = '2_お読みください.txt';
 
 function log(msg) {
   console.log(`▶ ${msg}`);
@@ -256,20 +263,43 @@ writeVbs(path.join(appDir, 'TaskManage.vbs'), readFileSync(path.join(templates, 
 writeUtf8Bom(path.join(appDir, 'setup.ps1'), readFileSync(path.join(templates, 'setup.ps1'), 'utf8'));
 writeBat(path.join(appDir, 'stop.bat'), readFileSync(path.join(templates, 'stop.bat'), 'utf8'));
 writeBat(path.join(appDir, 'uninstall.bat'), readFileSync(path.join(templates, 'uninstall.bat'), 'utf8'));
-writeBat(path.join(stage, 'install.bat'), readFileSync(path.join(templates, 'install.bat'), 'utf8'));
-writeUtf8Bom(path.join(stage, 'README.txt'), readFileSync(path.join(templates, 'README.txt'), 'utf8'));
 writeFileSync(path.join(appDir, 'VERSION'), `${version}\n`);
 
 log('アイコンを生成しています');
 writeFileSync(path.join(appDir, 'app.ico'), buildIco([16, 32, 48, 64]));
 if (process.env.ICON_PREVIEW) writeFileSync(process.env.ICON_PREVIEW, buildPng(128));
 
-log('zip にまとめています');
-const zipPath = path.join(outRoot, `${stageName}.zip`);
-const zip = spawnSync('zip', ['-qr', zipPath, stageName], { cwd: outRoot, stdio: 'inherit' });
-if (zip.status !== 0) {
-  console.error('zip の作成に失敗しました（zip コマンドが必要です）。');
+log('アプリ本体を 1 つの zip にまとめています');
+mkdirSync(stage, { recursive: true });
+const payloadZip = path.join(stage, PAYLOAD_NAME);
+const inner = spawnSync('zip', ['-qr', payloadZip, '.'], { cwd: payloadDir, stdio: 'inherit' });
+if (inner.status !== 0) {
+  console.error('アプリ本体の zip 化に失敗しました（zip コマンドが必要です）。');
   process.exit(1);
 }
+
+log('手順ファイルを書き出しています');
+writeBat(path.join(stage, INSTALLER_NAME), readFileSync(path.join(templates, 'install.bat'), 'utf8'));
+writeUtf8Bom(path.join(stage, READ_ME_NAME), readFileSync(path.join(templates, 'README.txt'), 'utf8'));
+
+log('配布用 zip を書き出しています');
+/** stage 以下を再帰的に集める（フォルダが無いので実際は 1 階層）。 */
+function collect(dir, prefix, out = []) {
+  for (const name of readdirSync(dir).sort()) {
+    const full = path.join(dir, name);
+    const rel = prefix ? `${prefix}/${name}` : name;
+    if (statSync(full).isDirectory()) {
+      out.push({ name: `${rel}/`, directory: true, data: Buffer.alloc(0) });
+      collect(full, rel, out);
+    } else {
+      out.push({ name: rel, data: readFileSync(full) });
+    }
+  }
+  return out;
+}
+
+const zipPath = path.join(outRoot, `${stageName}.zip`);
+writeFileSync(zipPath, createZip(collect(stage, stageName)));
+rmSync(payloadDir, { recursive: true, force: true });
 
 console.log(`\n✔ 完成しました: ${path.relative(root, zipPath)}`);

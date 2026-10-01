@@ -61,7 +61,7 @@ jobs:
 
           ## 添付ファイル
 
-          - `TaskManage-Setup-v*.zip` … 社内配布用のインストーラー（Windows）。解凍して `install.bat` を実行してください。
+          - `TaskManage-Setup-v*.zip` … 社内配布用のインストーラー（Windows）。「すべて展開」して `1_インストール.bat` を実行してください。
           - `task-manage-local.zip` … ソースとビルド済み成果物（node_modules は除外）。
 
           ## データの保存場所

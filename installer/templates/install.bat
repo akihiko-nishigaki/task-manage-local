@@ -45,11 +45,15 @@ echo.
 
 set "INSTALL_DIR=%LOCALAPPDATA%\Programs\TaskManage"
 set "DATA_DIR=%LOCALAPPDATA%\task-manage-local\data"
-set "SRC=%~dp0app"
+set "HERE=%~dp0"
+set "SRCZIP=%HERE%3_program.zip"
 
-if not exist "%SRC%\server.cjs" (
-  echo [エラー] インストール用のファイルが見つかりません。
-  echo         zip を解凍したフォルダの中から、このファイルを実行してください。
+if not exist "%SRCZIP%" (
+  echo [エラー] インストール用のファイル「3_program.zip」が見つかりません。
+  echo.
+  echo   zip を「すべて展開」してから、展開先のフォルダにある
+  echo   このファイルを実行してください。
+  echo   （zip を開いたまま直接実行すると失敗します）
   echo.
   pause
   exit /b 1
@@ -76,12 +80,32 @@ if exist "%INSTALL_DIR%\app.pid" (
   del "%INSTALL_DIR%\app.pid" >nul 2>nul
 )
 
-echo ファイルをコピーしています...
+echo ファイルを展開しています...
 if exist "%INSTALL_DIR%" rmdir /s /q "%INSTALL_DIR%"
 mkdir "%INSTALL_DIR%" >nul 2>nul
-xcopy "%SRC%" "%INSTALL_DIR%" /E /I /Q /Y >nul
-if errorlevel 1 (
-  echo [エラー] ファイルのコピーに失敗しました。
+
+REM まず PowerShell で展開し、だめなら Windows 標準の tar を使う。
+set "UNPACKED="
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "Expand-Archive -LiteralPath '%SRCZIP%' -DestinationPath '%INSTALL_DIR%' -Force" >nul 2>nul
+if exist "%INSTALL_DIR%\server.cjs" set "UNPACKED=1"
+
+if not defined UNPACKED (
+  where tar >nul 2>nul
+  if not errorlevel 1 (
+    tar -xf "%SRCZIP%" -C "%INSTALL_DIR%" >nul 2>nul
+    if exist "%INSTALL_DIR%\server.cjs" set "UNPACKED=1"
+  )
+)
+if not defined UNPACKED (
+  echo [エラー] ファイルの展開に失敗しました。
+  echo.
+  echo   お手数ですが、次の方法で手動インストールできます。
+  echo     1. 「3_program.zip」を右クリックして「すべて展開」
+  echo     2. 中身をすべて次のフォルダへコピー
+  echo        %INSTALL_DIR%
+  echo     3. そのフォルダの TaskManage.vbs をダブルクリック
+  echo.
   pause
   exit /b 1
 )
