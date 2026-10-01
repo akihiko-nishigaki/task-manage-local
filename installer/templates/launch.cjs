@@ -3,7 +3,6 @@
 // 外部への通信は一切行わない。
 const fs = require('node:fs');
 const net = require('node:net');
-const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
@@ -12,18 +11,9 @@ const HOST = '127.0.0.1';
 const BASE_PORT = Number(process.env.TASKMANAGE_PORT || process.env.PORT || 3000);
 const PORT_TRIES = 20;
 
-/** データの保存先。既定は %LOCALAPPDATA%\TaskManage\data（Windows 以外はホーム配下）。 */
-function resolveDataDir() {
-  if (process.env.TASKMANAGE_DATA_DIR) return path.resolve(process.env.TASKMANAGE_DATA_DIR);
-  const base =
-    process.platform === 'win32'
-      ? process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
-      : path.join(os.homedir(), '.local', 'share');
-  return path.join(base, 'TaskManage', 'data');
-}
-
-const DATA_DIR = resolveDataDir();
-const PID_FILE = path.join(DATA_DIR, 'app.pid');
+// データの保存先はサーバー側（dataDir.ts）が OS ごとに決める。
+// ここでは場所を重複して定義せず、停止用の PID ファイルだけをアプリのフォルダに置く。
+const PID_FILE = path.join(APP_DIR, 'app.pid');
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -90,10 +80,8 @@ async function main() {
   }
 
   // 3. サーバーを同じプロセスで起動する
-  fs.mkdirSync(DATA_DIR, { recursive: true });
   process.env.HOST = HOST;
   process.env.PORT = String(port);
-  process.env.DATA_DIR = DATA_DIR;
   process.env.WEB_DIR = path.join(APP_DIR, 'web');
   require(path.join(APP_DIR, 'server.cjs'));
 

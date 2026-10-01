@@ -1,5 +1,7 @@
 // API クライアント: 同一オリジンの /api のみを呼び出す（外部通信は一切行わない）。
 import type {
+  ArchiveResult,
+  ArchiveTasksInput,
   Comment,
   CreateCommentInput,
   CreateMemberInput,
@@ -125,7 +127,7 @@ async function request<T>(
 }
 
 export const api = {
-  health: () => request<{ ok: boolean; version: string }>('GET', '/health'),
+  health: () => request<{ ok: boolean; version: string; dataDir?: string }>('GET', '/health'),
 
   // --- メンバー ---
   listMembers: async (): Promise<Member[]> =>
@@ -168,6 +170,10 @@ export const api = {
     request<Task>('PATCH', `/tasks/${id}`, { body: input }),
   deleteTask: (id: number) => request<void>('DELETE', `/tasks/${id}`),
   reorderTasks: (input: ReorderInput) => request<void>('POST', '/tasks/reorder', { body: input }),
+  archiveTasks: (input: ArchiveTasksInput) =>
+    request<ArchiveResult>('POST', '/tasks/archive', { body: input }),
+  unarchiveTasks: (ids: number[]) =>
+    request<ArchiveResult>('POST', '/tasks/unarchive', { body: { ids } }),
 
   // --- コメント ---
   addComment: (taskId: number, input: CreateCommentInput) =>

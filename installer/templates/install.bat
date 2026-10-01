@@ -44,7 +44,7 @@ echo Node.js !NODEVER! を確認しました。
 echo.
 
 set "INSTALL_DIR=%LOCALAPPDATA%\Programs\TaskManage"
-set "DATA_DIR=%LOCALAPPDATA%\TaskManage\data"
+set "DATA_DIR=%LOCALAPPDATA%\task-manage-local\data"
 set "SRC=%~dp0app"
 
 if not exist "%SRC%\server.cjs" (
@@ -70,10 +70,10 @@ if /i "!OK!"=="n" (
 echo.
 
 REM ---- 起動中なら停止する ----
-if exist "%DATA_DIR%\app.pid" (
-  set /p OLDPID=<"%DATA_DIR%\app.pid"
+if exist "%INSTALL_DIR%\app.pid" (
+  set /p OLDPID=<"%INSTALL_DIR%\app.pid"
   taskkill /PID !OLDPID! /T /F >nul 2>nul
-  del "%DATA_DIR%\app.pid" >nul 2>nul
+  del "%INSTALL_DIR%\app.pid" >nul 2>nul
 )
 
 echo ファイルをコピーしています...

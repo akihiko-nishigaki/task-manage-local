@@ -1,4 +1,4 @@
-import { IconBoard, IconList, IconPlus, IconSearch } from './Icons';
+import { IconArchive, IconBoard, IconList, IconPlus, IconSearch } from './Icons';
 
 export type ViewMode = 'list' | 'kanban';
 
@@ -13,6 +13,9 @@ interface Props {
   onSearchChange: (v: string) => void;
   onCreateTask: () => void;
   canCreateTask: boolean;
+  /** 表示中の完了タスク数。1 以上のとき「完了をアーカイブ」ボタンを出す */
+  archivableCount?: number;
+  onArchiveDone?: () => void;
 }
 
 export function TopBar({
@@ -26,6 +29,8 @@ export function TopBar({
   onSearchChange,
   onCreateTask,
   canCreateTask,
+  archivableCount = 0,
+  onArchiveDone,
 }: Props) {
   return (
     <header className="topbar">
@@ -67,6 +72,19 @@ export function TopBar({
               onChange={(e) => onSearchChange(e.target.value)}
             />
           </div>
+        ) : null}
+
+        {onArchiveDone && archivableCount > 0 ? (
+          <button
+            type="button"
+            className="btn"
+            onClick={onArchiveDone}
+            title="表示中の完了タスクをまとめてアーカイブします（削除はしません）"
+          >
+            <IconArchive />
+            完了をアーカイブ
+            <span className="btn-count">{archivableCount}</span>
+          </button>
         ) : null}
 
         <button

@@ -75,6 +75,14 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_comments_task_id ON comments(task_id);
     `,
   },
+  {
+    // 完了タスクのアーカイブ（一覧から隠すだけで削除はしない）
+    version: 2,
+    sql: `
+      ALTER TABLE tasks ADD COLUMN archived_at TEXT;
+      CREATE INDEX IF NOT EXISTS idx_tasks_archived_at ON tasks(archived_at);
+    `,
+  },
 ];
 
 function migrate(db: Db): void {

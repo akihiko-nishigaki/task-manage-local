@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useStore } from '../store';
 import { navigate, sameRoute, type Route } from '../router';
 import {
+  IconArchive,
   IconHome,
   IconInbox,
   IconPlus,
@@ -139,6 +140,7 @@ export function Sidebar({ route, onNewProject }: Props) {
       <nav className="nav-group sidebar-foot">
         {item({ name: 'members' }, <IconUsers />, 'メンバー')}
         {item({ name: 'tags' }, <IconTag />, 'タグ')}
+        {item({ name: 'archive' }, <IconArchive />, 'アーカイブ')}
         {item({ name: 'settings' }, <IconSettings />, '設定')}
       </nav>
     </aside>

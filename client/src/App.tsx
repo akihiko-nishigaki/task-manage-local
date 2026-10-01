@@ -15,6 +15,7 @@ import { KanbanView } from './views/KanbanView';
 import { MembersView } from './views/MembersView';
 import { TagsView } from './views/TagsView';
 import { SettingsView } from './views/SettingsView';
+import { ArchiveView } from './views/ArchiveView';
 import { IconArchive, IconEdit, IconTrash } from './components/Icons';
 
 const VIEW_KEY = 'taskmanage.viewMode';
@@ -38,6 +39,7 @@ export function App() {
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [projectModal, setProjectModal] = useState<{ project: Project | null } | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [archiveConfirm, setArchiveConfirm] = useState<number[] | null>(null);
 
   const setView = (v: ViewMode) => {
     setViewState(v);
@@ -87,6 +89,15 @@ export function App() {
 
   const isTaskRoute = route.name === 'dashboard' || route.name === 'all' || route.name === 'mine' || route.name === 'project';
 
+  // 「完了をアーカイブ」の対象 = 今の画面に表示されている完了タスク（検索・絞り込みも反映）
+  const archivableIds = useMemo(
+    () => (isTaskRoute && route.name !== 'dashboard' ? scopedTasks.filter((t) => t.status === 'done').map((t) => t.id) : []),
+    [isTaskRoute, route.name, scopedTasks],
+  );
+  const openArchiveConfirm = () => {
+    if (archivableIds.length > 0) setArchiveConfirm(archivableIds);
+  };
+
   const title = (() => {
     switch (route.name) {
       case 'dashboard':
@@ -101,6 +112,8 @@ export function App() {
         return 'メンバー管理';
       case 'tags':
         return 'タグ管理';
+      case 'archive':
+        return 'アーカイブ';
       case 'settings':
         return '設定';
     }
@@ -135,6 +148,8 @@ export function App() {
         return <MembersView />;
       case 'tags':
         return <TagsView />;
+      case 'archive':
+        return <ArchiveView />;
       case 'settings':
         return <SettingsView />;
       default:
@@ -143,6 +158,7 @@ export function App() {
             tasks={scopedTasks}
             onOpenTask={setSelectedTaskId}
             quickAddProjectId={defaultProjectId}
+            onArchiveDone={openArchiveConfirm}
           />
         ) : (
           <ListView tasks={scopedTasks} onOpenTask={setSelectedTaskId} />
@@ -166,6 +182,8 @@ export function App() {
           onSearchChange={setSearch}
           onCreateTask={() => setShowCreateTask(true)}
           canCreateTask={projects.length > 0}
+          archivableCount={archivableIds.length}
+          onArchiveDone={openArchiveConfirm}
         />
 
         {activeProject ? (
@@ -223,6 +241,20 @@ export function App() {
 
       {projectModal ? (
         <ProjectModal project={projectModal.project} onClose={() => setProjectModal(null)} />
+      ) : null}
+
+      {archiveConfirm ? (
+        <ConfirmDialog
+          title="完了タスクをアーカイブ"
+          message={`表示中の完了タスク ${archiveConfirm.length} 件をアーカイブして一覧から隠します。削除はされず、サイドバーの「アーカイブ」からいつでも戻せます。`}
+          confirmLabel="アーカイブ"
+          onCancel={() => setArchiveConfirm(null)}
+          onConfirm={() => {
+            const ids = archiveConfirm;
+            setArchiveConfirm(null);
+            void store.archiveTasks({ ids });
+          }}
+        />
       ) : null}
 
       {projectToDelete ? (

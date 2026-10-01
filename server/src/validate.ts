@@ -82,6 +82,14 @@ export function requireDate(value: unknown, field = 'dueDate'): string {
   return value;
 }
 
+/** ISO 8601 日時（例: 2026-01-31T00:00:00.000Z）。Date で解釈できれば正規化して返す。 */
+export function requireIsoDateTime(value: unknown, field: string): string {
+  if (typeof value !== 'string' || value.trim() === '' || Number.isNaN(Date.parse(value))) {
+    throw validationError(`${field} は ISO 8601 形式の日時である必要があります`);
+  }
+  return new Date(value).toISOString();
+}
+
 export function requireNullableDate(value: unknown, field = 'dueDate'): string | null {
   if (value === null || value === '') return null;
   return requireDate(value, field);

@@ -8,6 +8,7 @@ export type Route =
   | { name: 'project'; projectId: number }
   | { name: 'members' }
   | { name: 'tags' }
+  | { name: 'archive' }
   | { name: 'settings' };
 
 export function routeToHash(route: Route): string {
@@ -31,7 +32,14 @@ export function parseHash(hash: string): Route {
     if (Number.isFinite(id) && id > 0) return { name: 'project', projectId: id };
     return { name: 'all' };
   }
-  if (head === 'all' || head === 'mine' || head === 'members' || head === 'tags' || head === 'settings') {
+  if (
+    head === 'all' ||
+    head === 'mine' ||
+    head === 'members' ||
+    head === 'tags' ||
+    head === 'archive' ||
+    head === 'settings'
+  ) {
     return { name: head };
   }
   return { name: 'dashboard' };

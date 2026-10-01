@@ -4,7 +4,7 @@ setlocal EnableDelayedExpansion
 title タスク管理 のアンインストール
 
 set "INSTALL_DIR=%LOCALAPPDATA%\Programs\TaskManage"
-set "DATA_ROOT=%LOCALAPPDATA%\TaskManage"
+set "DATA_ROOT=%LOCALAPPDATA%\task-manage-local"
 set "DATA_DIR=%DATA_ROOT%\data"
 
 echo.
@@ -26,10 +26,10 @@ if /i not "!OK!"=="y" (
 echo.
 
 REM ---- 起動中なら停止する ----
-if exist "%DATA_DIR%\app.pid" (
-  set /p OLDPID=<"%DATA_DIR%\app.pid"
+if exist "%INSTALL_DIR%\app.pid" (
+  set /p OLDPID=<"%INSTALL_DIR%\app.pid"
   taskkill /PID !OLDPID! /T /F >nul 2>nul
-  del "%DATA_DIR%\app.pid" >nul 2>nul
+  del "%INSTALL_DIR%\app.pid" >nul 2>nul
 )
 
 echo ショートカットを削除しています...

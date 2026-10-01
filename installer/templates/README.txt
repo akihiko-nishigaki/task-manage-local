@@ -35,7 +35,7 @@
 
 ■ データの保存場所
 
-  %LOCALAPPDATA%\TaskManage\data\tasks.db
+  %LOCALAPPDATA%\task-manage-local\data\tasks.db
 
   このファイル 1 つにすべてのタスクが入っています。
   バックアップはこのファイルをコピーしてください。

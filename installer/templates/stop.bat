@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal EnableDelayedExpansion
 title タスク管理 の終了
 
-set "PIDFILE=%LOCALAPPDATA%\TaskManage\data\app.pid"
+set "PIDFILE=%LOCALAPPDATA%\Programs\TaskManage\app.pid"
 
 if not exist "%PIDFILE%" (
   echo タスク管理は起動していません。

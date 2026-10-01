@@ -9,7 +9,12 @@
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` | 待受アドレス。LAN 内で共有する場合のみ `0.0.0.0` を指定する |
 | `PORT` | `3000` | 待受ポート |
-| `DATA_DIR` | `<リポジトリ>/data` | SQLite ファイル `tasks.db` を置くディレクトリ（無ければ自動作成）。相対パスはカレントディレクトリ基準 |
+| `DATA_DIR` | OS のユーザーデータ領域（下記） | SQLite ファイル `tasks.db` を置くディレクトリ（無ければ自動作成）。相対パスはカレントディレクトリ基準 |
+
+既定の保存先は `src/dataDir.ts` で決める。Windows は `%LOCALAPPDATA%	ask-manage-local\data`、
+macOS は `~/Library/Application Support/task-manage-local/data`、それ以外は `$XDG_DATA_HOME` または `~/.local/share` 配下。
+`DATA_DIR` 未指定のときだけ、旧保存先 `<リポジトリ>/data/tasks.db` があり新保存先に DB が無ければ起動時にコピーして引き継ぐ
+（旧ファイルは残し `MOVED.txt` を置く）。起動時に stderr へ `[data] <DB のパス>` を 1 行出す。
 
 DB は WAL モード・外部キー制約 ON で開く。バックアップは `data/tasks.db*` のコピー、
 または `GET /api/export` の JSON をローカル保存する。
@@ -41,12 +46,20 @@ npm run typecheck -w server  # 型検査のみ
 
 エンドポイントは `docs/PLAN.md` §5、レスポンスの型は `shared/types.ts` を正とする。補足:
 
+- `GET /api/health` は `{ ok, version, dataDir }`（`dataDir` は起動オプションで渡された場合のみ）。
 - 作成は `201`、削除は `204`（本文なし）。エラーは `{ error: { code, message } }`。
   `code` は `validation`（400）/ `not_found`（404）/ `conflict`（409、タグ名重複）/
   `payload_too_large`（413）/ `internal`（500）。
 - `GET /api/tasks` の並び順はステータス（未着手→進行中→レビュー→完了）→ `position` → `id`。
   `q` はタイトルと説明の部分一致（大文字小文字を区別しない）。`includeDone` は既定 `true` で、
   `0` / `false` のときだけ完了タスクを除外する。`dueBefore` / `dueAfter` は境界を含む。
+  アーカイブ済み（`archivedAt` が非 null）は既定で除外し、`includeArchived=1` で含める、
+  `archivedOnly=1` でアーカイブ済みのみ返す。
+- `POST /api/tasks/archive` は完了タスクの一括アーカイブ。`{ ids }` を渡すとその id のみ
+  （完了以外が混ざると 400 で全体をロールバック）、省略時は `{ projectId?, completedBefore? }` に
+  合致する完了タスクすべて。削除はせず `archivedAt` を付けるだけ。応答は `{ count, tasks }`。
+- `POST /api/tasks/unarchive` は `{ ids }` のアーカイブ解除（ステータスは完了のまま）。
+  `PATCH` / `reorder` で完了以外のステータスへ戻した場合も自動でアーカイブ解除される。
 - `POST /api/tasks` の `position` は同一プロジェクト・同一ステータス内の最大値 + 1。
   ステータスが `done` になると `completedAt` が入り、`done` から外れると `null` に戻る。
 - `POST /api/tasks/reorder` は 1 トランザクションで更新し、更新後のタスク配列を返す。
