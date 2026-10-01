@@ -34,8 +34,13 @@ jobs:
       - name: zip を作成
         run: |
           zip -qr task-manage-local.zip . \
-            -x ".git/*" ".github/*" "node_modules/*" "*/node_modules/*" "data/*" "*.db"
+            -x ".git/*" ".github/*" "node_modules/*" "*/node_modules/*" "data/*" "*.db" "dist-installer/*"
           ls -la task-manage-local.zip
+
+      - name: Windows 用インストーラーを作成
+        run: |
+          npm run build:installer
+          ls -la dist-installer/*.zip
 
       - name: Release を作成して zip を添付
         env:
@@ -54,12 +59,15 @@ jobs:
           ```
           LAN 共有時は `HOST=0.0.0.0 npm start`。詳細は README.md を参照してください。
 
-          zip にはソースとビルド済み成果物（client/dist, server/dist）が含まれます（node_modules は除外）。
+          添付ファイルは 2 種類です。
+
+          - `TaskManage-Setup-v*.zip` … 社内配布用のインストーラー（Windows）。解凍して `install.bat` を実行してください。
+          - `task-manage-local.zip` … ソースとビルド済み成果物（node_modules は除外）。
           MD
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" task-manage-local.zip --clobber
+            gh release upload "$TAG" task-manage-local.zip dist-installer/*.zip --clobber
           else
-            gh release create "$TAG" task-manage-local.zip \
+            gh release create "$TAG" task-manage-local.zip dist-installer/*.zip \
               --target "$GITHUB_SHA" \
               --title "$TAG 社内タスク管理ツール（ローカル完結版）" \
               --notes-file notes.md

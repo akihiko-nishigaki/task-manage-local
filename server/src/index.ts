@@ -36,8 +36,13 @@ const dataDir = process.env['DATA_DIR']
   : path.join(repoRoot, 'data');
 mkdirSync(dataDir, { recursive: true });
 
+// WEB_DIR: インストール版のように client/dist と別構成で配置する場合に指定する。
+const webDir = process.env['WEB_DIR']
+  ? path.resolve(process.cwd(), process.env['WEB_DIR'])
+  : path.join(repoRoot, 'client', 'dist');
+
 const db = createDb(path.join(dataDir, 'tasks.db'));
-const app = createApp(db, { clientDist: path.join(repoRoot, 'client', 'dist') });
+const app = createApp(db, { clientDist: webDir });
 
 const server = app.listen(port, host, () => {
   const address = server.address();

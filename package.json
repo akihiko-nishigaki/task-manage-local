@@ -15,7 +15,8 @@
     "start:server": "npm run start -w server",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "check:offline": "node scripts/check-offline.mjs"
+    "check:offline": "node scripts/check-offline.mjs",
+    "build:installer": "node scripts/build-installer.mjs"
   },
   "engines": {
     "node": ">=22.13"
