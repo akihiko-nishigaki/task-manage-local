@@ -18,37 +18,58 @@
 
 ## インストール版（Windows・社内配布用）
 
-社内の人に配るときは、インストーラー形式の zip を渡します。
-受け取った人は zip を「すべて展開」して、先頭にある `1_インストール.bat` をダブルクリックするだけです。
+社内の人に配るときは、インストーラー形式の zip を渡します（ABS-Anken-Manage と同じ形式）。
+受け取った人は zip を「すべて展開」して、展開したフォルダの `install.bat` をダブルクリックするだけです。
 管理者権限は不要で、ユーザーフォルダ内だけにインストールされます。
 
 | 項目 | 内容 |
 | --- | --- |
 | インストール先 | `%LOCALAPPDATA%\Programs\TaskManage` |
-| データ保存先 | `%LOCALAPPDATA%\TaskManage\data\tasks.db` |
-| 起動 | デスクトップの「タスク管理」ショートカット |
+| データ保存先 | `%LOCALAPPDATA%	ask-manage-local\data	asks.db` |
+| 起動 | デスクトップ / スタートメニューの「タスク管理」ショートカット |
 | 終了 | インストール先の `stop.bat`（通常は電源を切れば終了） |
-| アンインストール | 「設定 > アプリ」の一覧、または `uninstall.bat` |
-| 前提ソフト | Node.js 22.13 以上（未導入ならセットアップ時に案内が出ます） |
+| アンインストール | 「設定 > アプリ」の一覧、またはインストール先の `uninstall.bat`（データは残る） |
+| 前提ソフト | Node.js 22.13 以上（無い・古い場合はインストーラーが止まって案内を出します） |
 
-インストーラーを作るには、次のコマンドを実行します。
+### 配布する側
+
+`package.json` の `version` を上げてから、次のコマンドを実行します（Windows でも Linux でも動きます）。
 
 ```bash
 npm run build:installer
-# → dist-installer/TaskManage-Setup-v0.1.0.zip
+# → dist-installer/TaskManage-Setup-v<version>.zip
 ```
 
 この zip を社内の共有フォルダなどに置いて配布してください。
 サーバー側は 1 ファイルにまとめてあるため、配布物に `node_modules` は含まれません。
-
-配布 zip の中身は次の 3 つだけです。フォルダを置かないことで、
-エクスプローラーでインストーラーが一番上に並ぶようにしています。
+zip の中身はフォルダ無しで次のとおり並びます。
 
 ```
-1_インストール.bat      ← これをダブルクリック
-2_お読みください.txt
-3_program.zip           ← アプリ本体（インストーラーが展開します）
+install.bat / install.ps1        ← install.bat をダブルクリック
+uninstall.bat / uninstall.ps1
+stop.bat / stop.ps1
+README.txt                       ← 受け取る人向けの手順
+server.cjs  launch.cjs  TaskManage.vbs  app.ico  VERSION  web/   ← アプリ本体
 ```
+
+### 受け取る側
+
+1. zip を「すべて展開」し、展開したフォルダの `install.bat` をダブルクリックする
+   - 確認の質問は無い。アプリ一式を `%LOCALAPPDATA%\Programs\TaskManage` にコピーし、デスクトップとスタートメニューに「タスク管理」のショートカットを作り、「設定 > アプリ」に登録して起動する
+   - `install.bat` は最後に必ず一時停止するので、コピー元 / コピー先とインストールされた版（`VERSION`）を確認してからウィンドウを閉じる
+   - 新しい版に入れ替えるときも同じ手順（起動中なら止めてから上書きする。データには触らない）
+   - インストール済みフォルダの `install.bat` を実行しても、コピー元と先が同じためファイルは入れ替わらない（黄色で「コピー元とコピー先が同じです」と出る）
+2. 消すときは「設定 > アプリ」または インストール先の `uninstall.bat`（ショートカット・登録・アプリのフォルダを消す。データは残る）
+
+オプションを付けるときは PowerShell で `install.ps1` / `uninstall.ps1` を直接実行します（`.bat` に引数を付けても同じ）。
+
+```
+powershell -ExecutionPolicy Bypass -File install.ps1 -Startup          # PC 起動時に自動で立ち上げる
+powershell -ExecutionPolicy Bypass -File install.ps1 -Dest D:\Tools\TaskManage
+powershell -ExecutionPolicy Bypass -File uninstall.ps1 -RemoveData     # データも削除する
+```
+
+`install.ps1` のオプション: `-Dest`（インストール先）/ `-ShortcutDir`（ショートカットの場所）/ `-NoShortcut` / `-NoStartMenu` / `-Startup` / `-NoLaunch`。
 
 インストール版でも通信の扱いは変わりません。データは端末内の SQLite に保存され、社外へは一切送信しません。
 インターネットが必要なのは Node.js を入れるときだけです。

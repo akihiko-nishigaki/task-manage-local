@@ -1,8 +1,10 @@
 // Windows 向けインストーラー一式を組み立てる。
 // 出力: dist-installer/TaskManage-Setup-v<version>.zip
 // サーバーは 1 ファイルにバンドルするため、配布物に node_modules は含まれない。
+// zip の中身はアプリ一式 + install.bat / install.ps1 / uninstall.bat / uninstall.ps1 + README.txt を
+// フォルダ無しで並べたもの。受け取った側は展開して install.bat を実行する（ABS-Anken-Manage と同じ形式）。
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
@@ -13,21 +15,18 @@ const templates = path.join(root, 'installer', 'templates');
 const outRoot = path.join(root, 'dist-installer');
 const version = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 const stageName = `TaskManage-Setup-v${version}`;
-const stage = path.join(outRoot, stageName);
-// アプリ本体は 1 つの zip にまとめる。配布 zip の一番上の階層をフォルダ無しにして、
-// エクスプローラーで「インストール」が先頭に並ぶようにするため。
-const payloadDir = path.join(outRoot, '.payload');
-const appDir = payloadDir;
-const PAYLOAD_NAME = '3_program.zip';
-const INSTALLER_NAME = '1_インストール.bat';
-const READ_ME_NAME = '2_お読みください.txt';
+const appDir = path.join(outRoot, stageName);
 
 function log(msg) {
   console.log(`▶ ${msg}`);
 }
 
 function run(cmd, args, label) {
-  const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit' });
+  // Windows の npm は npm.cmd なので shell 経由で呼ぶ（引数は空白を含まない固定値だけ）
+  const r =
+    process.platform === 'win32'
+      ? spawnSync([cmd, ...args].join(' '), { cwd: root, stdio: 'inherit', shell: true })
+      : spawnSync(cmd, args, { cwd: root, stdio: 'inherit' });
   if (r.status !== 0) {
     console.error(`${label}に失敗しました。`);
     process.exit(1);
@@ -234,56 +233,44 @@ run('npm', ['run', 'build'], 'ビルド');
 log('サーバーを 1 ファイルにまとめています');
 rmSync(outRoot, { recursive: true, force: true });
 mkdirSync(appDir, { recursive: true });
-const esbuild = path.join(root, 'node_modules', '.bin', 'esbuild');
-if (!existsSync(esbuild)) {
+let esbuild;
+try {
+  esbuild = await import('esbuild');
+} catch {
   console.error('esbuild が見つかりません。先に npm install を実行してください。');
   process.exit(1);
 }
-run(
-  esbuild,
-  [
-    path.join(root, 'server', 'dist', 'server', 'src', 'index.js'),
-    '--bundle',
-    '--platform=node',
-    '--format=cjs',
-    '--target=node22',
-    '--define:import.meta.url=__import_meta_url',
-    "--banner:js=const __import_meta_url = require('url').pathToFileURL(__filename).href;",
-    `--outfile=${path.join(appDir, 'server.cjs')}`,
-  ],
-  'サーバーのバンドル',
-);
+// .cmd 経由だと --banner の引用符が崩れるため、コマンドではなく API で呼ぶ
+await esbuild.build({
+  entryPoints: [path.join(root, 'server', 'dist', 'server', 'src', 'index.js')],
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'node22',
+  define: { 'import.meta.url': '__import_meta_url' },
+  banner: { js: "const __import_meta_url = require('url').pathToFileURL(__filename).href;" },
+  outfile: path.join(appDir, 'server.cjs'),
+  logLevel: 'warning',
+});
 
 log('画面ファイルをコピーしています');
 cpSync(path.join(root, 'client', 'dist'), path.join(appDir, 'web'), { recursive: true });
 
-log('起動用ファイルを書き出しています');
+log('起動用ファイルとインストーラーを書き出しています');
+const tpl = (name) => readFileSync(path.join(templates, name), 'utf8');
 writeFileSync(path.join(appDir, 'launch.cjs'), readFileSync(path.join(templates, 'launch.cjs')));
-writeVbs(path.join(appDir, 'TaskManage.vbs'), readFileSync(path.join(templates, 'TaskManage.vbs'), 'utf8'));
-writeUtf8Bom(path.join(appDir, 'setup.ps1'), readFileSync(path.join(templates, 'setup.ps1'), 'utf8'));
-writeBat(path.join(appDir, 'stop.bat'), readFileSync(path.join(templates, 'stop.bat'), 'utf8'));
-writeBat(path.join(appDir, 'uninstall.bat'), readFileSync(path.join(templates, 'uninstall.bat'), 'utf8'));
-writeFileSync(path.join(appDir, 'VERSION'), `${version}\n`);
+writeVbs(path.join(appDir, 'TaskManage.vbs'), tpl('TaskManage.vbs'));
+for (const name of ['install.bat', 'uninstall.bat', 'stop.bat']) writeBat(path.join(appDir, name), tpl(name));
+for (const name of ['install.ps1', 'uninstall.ps1', 'stop.ps1', 'README.txt']) writeUtf8Bom(path.join(appDir, name), tpl(name));
+writeFileSync(path.join(appDir, 'VERSION'), `${version}
+`);
 
 log('アイコンを生成しています');
 writeFileSync(path.join(appDir, 'app.ico'), buildIco([16, 32, 48, 64]));
 if (process.env.ICON_PREVIEW) writeFileSync(process.env.ICON_PREVIEW, buildPng(128));
 
-log('アプリ本体を 1 つの zip にまとめています');
-mkdirSync(stage, { recursive: true });
-const payloadZip = path.join(stage, PAYLOAD_NAME);
-const inner = spawnSync('zip', ['-qr', payloadZip, '.'], { cwd: payloadDir, stdio: 'inherit' });
-if (inner.status !== 0) {
-  console.error('アプリ本体の zip 化に失敗しました（zip コマンドが必要です）。');
-  process.exit(1);
-}
-
-log('手順ファイルを書き出しています');
-writeBat(path.join(stage, INSTALLER_NAME), readFileSync(path.join(templates, 'install.bat'), 'utf8'));
-writeUtf8Bom(path.join(stage, READ_ME_NAME), readFileSync(path.join(templates, 'README.txt'), 'utf8'));
-
 log('配布用 zip を書き出しています');
-/** stage 以下を再帰的に集める（フォルダが無いので実際は 1 階層）。 */
+/** dir 以下を再帰的に集める。 */
 function collect(dir, prefix, out = []) {
   for (const name of readdirSync(dir).sort()) {
     const full = path.join(dir, name);
@@ -298,8 +285,10 @@ function collect(dir, prefix, out = []) {
   return out;
 }
 
+// zip の一番上にフォルダを作らず、展開したフォルダの直下に install.bat が来るようにする
 const zipPath = path.join(outRoot, `${stageName}.zip`);
-writeFileSync(zipPath, createZip(collect(stage, stageName)));
-rmSync(payloadDir, { recursive: true, force: true });
+writeFileSync(zipPath, createZip(collect(appDir, '')));
 
-console.log(`\n✔ 完成しました: ${path.relative(root, zipPath)}`);
+console.log(`
+✔ 完成しました: ${path.relative(root, zipPath)}`);
+console.log('  配布先では zip を「すべて展開」して install.bat を実行してください。');
