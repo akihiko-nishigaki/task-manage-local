@@ -1,8 +1,15 @@
 import { useMemo, useState } from 'react';
-import type { Task, TaskPriority, TaskStatus } from '@shared/types';
-import { PRIORITY_LABELS, STATUS_LABELS, TASK_PRIORITIES, TASK_STATUSES } from '@shared/types';
+import type { Task, TaskChannel, TaskPriority, TaskStatus } from '@shared/types';
+import {
+  CHANNEL_LABELS,
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  TASK_CHANNELS,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+} from '@shared/types';
 import { useStore } from '../store';
-import { Assignee, DueDate, PriorityBadge, TagList } from '../components/Badges';
+import { Assignee, ChannelBadge, DueDate, PriorityBadge, TagList, TaskLink } from '../components/Badges';
 
 type SortKey = 'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'position';
 
@@ -22,6 +29,7 @@ export function ListView({ tasks, onOpenTask }: Props) {
   const [fPriority, setFPriority] = useState<TaskPriority | ''>('');
   const [fAssignee, setFAssignee] = useState<string>('');
   const [fTag, setFTag] = useState<string>('');
+  const [fChannel, setFChannel] = useState<TaskChannel | ''>('');
   const [showDone, setShowDone] = useState(false);
 
   const filtered = useMemo(() => {
@@ -32,9 +40,10 @@ export function ListView({ tasks, onOpenTask }: Props) {
       if (fAssignee === 'none' && t.assigneeId !== null) return false;
       if (fAssignee && fAssignee !== 'none' && t.assigneeId !== Number(fAssignee)) return false;
       if (fTag && !t.tagIds.includes(Number(fTag))) return false;
+      if (fChannel && t.channel !== fChannel) return false;
       return true;
     });
-  }, [tasks, showDone, fStatus, fPriority, fAssignee, fTag]);
+  }, [tasks, showDone, fStatus, fPriority, fAssignee, fTag, fChannel]);
 
   const sorted = useMemo(() => {
     const dir = asc ? 1 : -1;
@@ -122,6 +131,18 @@ export function ListView({ tasks, onOpenTask }: Props) {
             </option>
           ))}
         </select>
+        <select
+          value={fChannel}
+          onChange={(e) => setFChannel(e.target.value as TaskChannel | '')}
+          aria-label="チャネルで絞り込み"
+        >
+          <option value="">チャネル: すべて</option>
+          {TASK_CHANNELS.map((c) => (
+            <option key={c} value={c}>
+              {CHANNEL_LABELS[c]}
+            </option>
+          ))}
+        </select>
         <select value={fTag} onChange={(e) => setFTag(e.target.value)} aria-label="タグで絞り込み">
           <option value="">タグ: すべて</option>
           {tags.map((t) => (
@@ -154,6 +175,7 @@ export function ListView({ tasks, onOpenTask }: Props) {
                 {header('priority', '優先度')}
                 {header('assignee', '担当')}
                 {header('dueDate', '期限')}
+                <th>チャネル</th>
                 <th>タグ</th>
               </tr>
             </thead>
@@ -193,6 +215,13 @@ export function ListView({ tasks, onOpenTask }: Props) {
                   </td>
                   <td>
                     <DueDate due={t.dueDate} done={t.status === 'done'} />
+                  </td>
+                  <td>
+                    <span className="cell-channel">
+                      <ChannelBadge channel={t.channel} />
+                      <TaskLink link={t.link} compact />
+                      {!t.channel && !t.link ? <span className="muted">—</span> : null}
+                    </span>
                   </td>
                   <td>
                     <TagList

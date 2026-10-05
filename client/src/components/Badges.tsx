@@ -1,5 +1,6 @@
-import type { Member, Tag, TaskPriority, TaskStatus } from '@shared/types';
-import { PRIORITY_LABELS, STATUS_LABELS } from '@shared/types';
+import type { Member, Tag, TaskChannel, TaskPriority, TaskStatus } from '@shared/types';
+import { CHANNEL_LABELS, isSafeLink, PRIORITY_LABELS, STATUS_LABELS } from '@shared/types';
+import { IconLink } from './Icons';
 import { formatDueShort, isOverdue, isToday } from '../utils/date';
 
 export function PriorityBadge({ priority }: { priority: TaskPriority }) {
@@ -60,4 +61,45 @@ export function DueDate({ due, done = false }: { due: string | null; done?: bool
 
 export function ColorDot({ color }: { color: string }) {
   return <span className="color-dot" style={{ background: color }} aria-hidden="true" />;
+}
+
+export function ChannelBadge({ channel }: { channel: TaskChannel | null }) {
+  if (!channel) return null;
+  return <span className={`channel channel-${channel}`}>{CHANNEL_LABELS[channel]}</span>;
+}
+
+/**
+ * 外部リンク。スキームを許可リストで確認してから <a> にする。
+ * 不正な値は見た目だけのテキストにして、クリックできないようにする。
+ */
+export function TaskLink({
+  link,
+  label,
+  compact = false,
+}: {
+  link: string | null;
+  label?: string;
+  compact?: boolean;
+}) {
+  if (!link) return null;
+  if (!isSafeLink(link)) {
+    return (
+      <span className="task-link task-link-invalid" title="このリンクは開けません">
+        リンク不正
+      </span>
+    );
+  }
+  return (
+    <a
+      className={`task-link${compact ? ' task-link-compact' : ''}`}
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={link}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <IconLink />
+      <span>{label ?? (compact ? 'リンク' : '開く')}</span>
+    </a>
+  );
 }

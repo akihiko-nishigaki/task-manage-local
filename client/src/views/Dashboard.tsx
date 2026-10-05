@@ -2,7 +2,7 @@ import { useMemo, useState, type DragEvent } from 'react';
 import type { Task, TaskPriority, TaskStatus } from '@shared/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
-import { Assignee, PriorityBadge, StatusBadge } from '../components/Badges';
+import { Assignee, ChannelBadge, PriorityBadge, StatusBadge, TaskLink } from '../components/Badges';
 import { IconAlert, IconBoard, IconCalendar, IconUser } from '../components/Icons';
 import { describeDue, formatDueShort, isOverdue, isWithinDays } from '../utils/date';
 
@@ -355,6 +355,8 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
                               </span>
                             ) : null}
                             <PriorityBadge priority={t.priority} />
+                            <ChannelBadge channel={t.channel} />
+                            <TaskLink link={t.link} compact />
                             {member ? <Assignee member={member} /> : null}
                             {t.dueDate ? (
                               <span

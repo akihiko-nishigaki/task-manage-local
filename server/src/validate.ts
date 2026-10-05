@@ -1,6 +1,12 @@
 // 入力検証ユーティリティ。不正入力は 400 { error: { code: 'validation', message } } になる。
-import { TASK_PRIORITIES, TASK_STATUSES } from '../../shared/types.js';
-import type { TaskPriority, TaskStatus } from '../../shared/types.js';
+import {
+  ALLOWED_LINK_SCHEMES,
+  MAX_LINK_LENGTH,
+  TASK_CHANNELS,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+} from '../../shared/types.js';
+import type { TaskChannel, TaskPriority, TaskStatus } from '../../shared/types.js';
 import { validationError } from './errors.js';
 
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -64,6 +70,40 @@ export function requirePriority(value: unknown, field = 'priority'): TaskPriorit
     throw validationError(`${field} は ${TASK_PRIORITIES.join(' / ')} のいずれかである必要があります`);
   }
   return value as TaskPriority;
+}
+
+export function requireNullableChannel(value: unknown, field = 'channel'): TaskChannel | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string' || !TASK_CHANNELS.includes(value as TaskChannel)) {
+    throw validationError(`${field} は ${TASK_CHANNELS.join(' / ')} のいずれかを指定してください。`);
+  }
+  return value as TaskChannel;
+}
+
+/**
+ * リンクは http / https / mailto / msteams のみ許可する。
+ * javascript: などをそのまま保存すると、画面に表示したときの危険があるため。
+ */
+export function requireNullableLink(value: unknown, field = 'link'): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') throw validationError(`${field} は文字列で指定してください。`);
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  if (trimmed.length > MAX_LINK_LENGTH) {
+    throw validationError(`${field} は ${MAX_LINK_LENGTH} 文字以内で指定してください。`);
+  }
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw validationError(
+      `${field} は http:// や https:// から始まる形式で指定してください（mailto: と msteams: も使えます）。`,
+    );
+  }
+  if (!(ALLOWED_LINK_SCHEMES as readonly string[]).includes(url.protocol)) {
+    throw validationError(`${field} に使えるのは ${ALLOWED_LINK_SCHEMES.join(' ')} のみです。`);
+  }
+  return trimmed;
 }
 
 export function isDateString(value: string): boolean {

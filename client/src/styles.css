@@ -1824,3 +1824,95 @@ textarea {
   border-radius: var(--radius-sm);
   word-break: break-all;
 }
+
+/* チャネル（メール / Teams / 口頭）とリンク */
+.channel {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.channel-email {
+  background: #fff4e5;
+  color: #9a5b00;
+  border-color: #f3d6ae;
+}
+.channel-teams {
+  background: #eceafb;
+  color: #4b3fa7;
+  border-color: #d3cdf3;
+}
+.channel-verbal {
+  background: #e9f5ee;
+  color: #1f6b43;
+  border-color: #c5e3d2;
+}
+
+.task-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.task-link:hover {
+  text-decoration: underline;
+}
+
+.task-link svg {
+  width: 13px;
+  height: 13px;
+}
+
+.task-link-compact span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.task-link-invalid {
+  color: var(--danger);
+  font-size: 11px;
+}
+
+.cell-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.link-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.link-field input {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-hint {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.field-hint.warn {
+  color: var(--danger);
+}
+
+input[aria-invalid='true'] {
+  border-color: var(--danger);
+}

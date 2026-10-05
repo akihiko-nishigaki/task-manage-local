@@ -189,14 +189,17 @@ test('エクスポート / インポートで archivedAt が往復する', async
   assert.equal((await target.get(`/api/tasks/${f.openId}`)).data.archivedAt, null);
 });
 
-test('マイグレーション version 2 で archived_at 列が追加される', async (t) => {
+test('マイグレーションが順に適用され、追加列が揃っている', async (t) => {
   const ctx = await createContext();
   t.after(() => ctx.close());
   const versions = ctx.db
     .prepare('SELECT version FROM schema_migrations ORDER BY version')
     .all()
     .map((row) => Number(row['version']));
-  assert.deepEqual(versions, [1, 2]);
+  // 版は 1 から連番で、抜けなく適用されていること（新しい版を足したらここも増える）
+  assert.deepEqual(versions, [1, 2, 3]);
   const cols = ctx.db.prepare('PRAGMA table_info(tasks)').all().map((row) => String(row['name']));
   assert.ok(cols.includes('archived_at'));
+  assert.ok(cols.includes('channel'));
+  assert.ok(cols.includes('link'));
 });

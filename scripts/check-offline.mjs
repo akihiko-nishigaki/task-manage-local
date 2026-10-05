@@ -36,6 +36,9 @@ for (const t of targets) {
     let m;
     while ((m = re.exec(text))) {
       if (allow.some((a) => a.test(m[0]))) continue;
+      // プレースホルダー（例: "https://…"）はホスト名が無いので通信しない
+      const host = m[0].replace(/^https?:\/\//, '').split(/[/?#]/)[0];
+      if (!/^[a-z0-9.-]+$/i.test(host)) continue;
       console.error(`外部 URL を検出: ${f}: ${m[0]}`);
       bad++;
     }

@@ -83,6 +83,15 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_tasks_archived_at ON tasks(archived_at);
     `,
   },
+  {
+    // やり取りしているチャネル（メール / Teams / 口頭）と、関連先へのリンク
+    version: 3,
+    sql: `
+      ALTER TABLE tasks ADD COLUMN channel TEXT;
+      ALTER TABLE tasks ADD COLUMN link TEXT;
+      CREATE INDEX IF NOT EXISTS idx_tasks_channel ON tasks(channel);
+    `,
+  },
 ];
 
 function migrate(db: Db): void {

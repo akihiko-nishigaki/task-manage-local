@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Comment, TaskPriority, TaskStatus } from '@shared/types';
-import { PRIORITY_LABELS, STATUS_LABELS, TASK_PRIORITIES, TASK_STATUSES } from '@shared/types';
+import type { Comment, Task, TaskPriority, TaskStatus } from '@shared/types';
+import {
+  CHANNEL_LABELS,
+  isSafeLink,
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  TASK_CHANNELS,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+} from '@shared/types';
 import { useStore } from '../store';
 import { ConfirmDialog, useEscapeKey } from './Modal';
 import { TagSelect } from './TagSelect';
 import { IconClose, IconTrash } from './Icons';
+import { TaskLink } from './Badges';
 import { formatDateTime } from '../utils/date';
 
 interface Props {
@@ -32,6 +41,7 @@ export function TaskDrawer({ taskId, onClose }: Props) {
   const [commentBody, setCommentBody] = useState('');
   const [titleDraft, setTitleDraft] = useState('');
   const [descDraft, setDescDraft] = useState('');
+  const [linkDraft, setLinkDraft] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [loadingComments, setLoadingComments] = useState(true);
 
@@ -41,8 +51,20 @@ export function TaskDrawer({ taskId, onClose }: Props) {
   useEffect(() => {
     setTitleDraft(task?.title ?? '');
     setDescDraft(task?.description ?? '');
+    setLinkDraft(task?.link ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
+
+  /** リンクは入力を離れたときに保存する。不正な値はサーバーに送らない。 */
+  const commitLink = useCallback(() => {
+    if (!task) return;
+    const next = linkDraft.trim();
+    const current = task.link ?? '';
+    if (next === current) return;
+    if (next !== '' && !isSafeLink(next)) return;
+    void updateTask(task.id, { link: next === '' ? null : next });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task, linkDraft, updateTask]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,6 +247,48 @@ export function TaskDrawer({ taskId, onClose }: Props) {
               value={task.dueDate ?? ''}
               onChange={(e) => void updateTask(task.id, { dueDate: e.target.value || null })}
             />
+
+            <label htmlFor="d-channel">チャネル</label>
+            <select
+              id="d-channel"
+              value={task.channel ?? ''}
+              onChange={(e) =>
+                void updateTask(task.id, { channel: (e.target.value || null) as Task['channel'] })
+              }
+            >
+              <option value="">未設定</option>
+              {TASK_CHANNELS.map((c) => (
+                <option key={c} value={c}>
+                  {CHANNEL_LABELS[c]}
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor="d-link">リンク</label>
+            <div className="link-field">
+              <input
+                id="d-link"
+                type="url"
+                inputMode="url"
+                placeholder="https://… / mailto:… （任意）"
+                value={linkDraft}
+                onChange={(e) => setLinkDraft(e.target.value)}
+                onBlur={commitLink}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                }}
+                aria-invalid={linkDraft.trim() !== '' && !isSafeLink(linkDraft) ? true : undefined}
+              />
+              <TaskLink link={task.link} />
+            </div>
+            {linkDraft.trim() !== '' && !isSafeLink(linkDraft) ? (
+              <>
+                <span />
+                <p className="field-hint warn">
+                  http:// https:// mailto: msteams: のいずれかで始まるリンクを入力してください。
+                </p>
+              </>
+            ) : null}
 
             <label htmlFor="d-project">プロジェクト</label>
             <select

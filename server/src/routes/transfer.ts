@@ -19,6 +19,8 @@ import {
   requirePriority,
   requireStatus,
   requireText,
+  requireNullableChannel,
+  requireNullableLink,
 } from '../validate.js';
 
 const EXPORT_VERSION = 1;
@@ -175,11 +177,11 @@ export function transferRouter(db: Db): Router {
       const insertTask = db.prepare(
         mode === 'replace'
           ? `INSERT INTO tasks (id, project_id, title, description, status, priority, assignee_id,
-               due_date, position, created_at, updated_at, completed_at, archived_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+               due_date, position, created_at, updated_at, completed_at, archived_at, channel, link)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           : `INSERT INTO tasks (project_id, title, description, status, priority, assignee_id,
-               due_date, position, created_at, updated_at, completed_at, archived_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               due_date, position, created_at, updated_at, completed_at, archived_at, channel, link)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       const insertTaskTag = db.prepare('INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?, ?)');
       for (const record of tasks) {
@@ -218,6 +220,9 @@ export function transferRouter(db: Db): Router {
           optIso(record, 'updatedAt', now),
           completedAt,
           archivedAt,
+          // 古いエクスポート（項目なし）は未設定扱い。不正なリンクは取り込み時に弾く
+          has(record, 'channel') ? requireNullableChannel(record['channel'], 'tasks[].channel') : null,
+          has(record, 'link') ? requireNullableLink(record['link'], 'tasks[].link') : null,
         ] as const;
         const info = mode === 'replace' ? insertTask.run(oldId, ...values) : insertTask.run(...values);
         const newTaskId = mode === 'replace' ? oldId : Number(info.lastInsertRowid);

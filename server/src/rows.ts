@@ -89,5 +89,7 @@ export function toTask(row: Row, tagIds: number[]): Task {
     updatedAt: str(row['updated_at']),
     completedAt: optStr(row['completed_at']),
     archivedAt: optStr(row['archived_at']),
+    channel: optStr(row['channel']) as Task['channel'],
+    link: optStr(row['link']),
   };
 }

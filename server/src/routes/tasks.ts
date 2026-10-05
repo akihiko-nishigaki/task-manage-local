@@ -34,6 +34,8 @@ import {
   requirePriority,
   requireStatus,
   requireText,
+  requireNullableChannel,
+  requireNullableLink,
 } from '../validate.js';
 
 // ステータスはカンバンの列順（todo → in_progress → review → done）で並べる
@@ -110,6 +112,11 @@ export function tasksRouter(db: Db): Router {
     if (priorityRaw !== undefined && priorityRaw !== '') {
       where.push('priority = ?');
       params.push(requirePriority(priorityRaw));
+    }
+    const channelRaw = queryString(req.query['channel']);
+    if (channelRaw !== undefined && channelRaw !== '') {
+      where.push('channel = ?');
+      params.push(requireNullableChannel(channelRaw));
     }
     const q = queryString(req.query['q']);
     if (q !== undefined && q.trim() !== '') {
@@ -257,6 +264,8 @@ export function tasksRouter(db: Db): Router {
     const dueDate = has(body, 'dueDate') ? requireNullableDate(body['dueDate']) : null;
     const tagIds = has(body, 'tagIds') ? requireIdArray(body['tagIds'], 'tagIds') : [];
     ensureTags(db, tagIds);
+    const channel = has(body, 'channel') ? requireNullableChannel(body['channel']) : null;
+    const link = has(body, 'link') ? requireNullableLink(body['link']) : null;
 
     const now = nowIso();
     const id = tx(db, () => {
@@ -264,8 +273,8 @@ export function tasksRouter(db: Db): Router {
         .prepare(
           `INSERT INTO tasks
              (project_id, title, description, status, priority, assignee_id, due_date, position,
-              created_at, updated_at, completed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              created_at, updated_at, completed_at, channel, link)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           projectId,
@@ -279,6 +288,8 @@ export function tasksRouter(db: Db): Router {
           now,
           now,
           status === 'done' ? now : null,
+          channel,
+          link,
         );
       const newId = Number(info.lastInsertRowid);
       if (tagIds.length > 0) setTaskTags(db, newId, tagIds);
@@ -326,6 +337,8 @@ export function tasksRouter(db: Db): Router {
       push('assignee_id = ?', assigneeId);
     }
     if (has(body, 'dueDate')) push('due_date = ?', requireNullableDate(body['dueDate']));
+    if (has(body, 'channel')) push('channel = ?', requireNullableChannel(body['channel']));
+    if (has(body, 'link')) push('link = ?', requireNullableLink(body['link']));
     if (has(body, 'priority')) push('priority = ?', requirePriority(body['priority']));
 
     const status = has(body, 'status') ? requireStatus(body['status']) : current.status;

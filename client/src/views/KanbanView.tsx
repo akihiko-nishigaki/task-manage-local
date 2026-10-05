@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { Task, TaskStatus } from '@shared/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
-import { Assignee, PriorityBadge, TagChip } from '../components/Badges';
+import { Assignee, ChannelBadge, PriorityBadge, TagChip, TaskLink } from '../components/Badges';
 import { IconArchive, IconPlus } from '../components/Icons';
 import { formatDueShort, isOverdue, isToday } from '../utils/date';
 
@@ -197,6 +197,8 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
                       </div>
                       <div className="task-card-foot">
                         <PriorityBadge priority={t.priority} />
+                        <ChannelBadge channel={t.channel} />
+                        <TaskLink link={t.link} compact />
                         <Assignee member={memberById(t.assigneeId)} />
                         {t.dueDate ? (
                           <span

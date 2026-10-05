@@ -13,6 +13,38 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   done: '完了',
 };
 
+/** やり取りしているチャネル。未設定は null。 */
+export type TaskChannel = 'email' | 'teams' | 'verbal';
+
+export const TASK_CHANNELS: TaskChannel[] = ['email', 'teams', 'verbal'];
+
+export const CHANNEL_LABELS: Record<TaskChannel, string> = {
+  email: 'メール',
+  teams: 'Teams',
+  verbal: '口頭',
+};
+
+/**
+ * リンクとして開くことを許可するスキーム。
+ * javascript: などを弾くための許可リストで、サーバー・クライアント双方で使う。
+ */
+export const ALLOWED_LINK_SCHEMES = ['http:', 'https:', 'mailto:', 'msteams:'] as const;
+
+export const MAX_LINK_LENGTH = 2000;
+
+/** 安全に開けるリンクかどうか。空文字・null は false。 */
+export function isSafeLink(value: string | null | undefined): boolean {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (trimmed === '' || trimmed.length > MAX_LINK_LENGTH) return false;
+  try {
+    const url = new URL(trimmed);
+    return (ALLOWED_LINK_SCHEMES as readonly string[]).includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
 export const PRIORITY_LABELS: Record<TaskPriority, string> = {
   low: '低',
   medium: '中',
@@ -69,6 +101,8 @@ export interface Task {
   updatedAt: string;
   completedAt: string | null;
   archivedAt: string | null; // アーカイブ済みなら ISO 8601、未アーカイブなら null
+  channel: TaskChannel | null; // やり取りしているチャネル
+  link: string | null; // 関連するメール / Teams などへのリンク
 }
 
 export interface TaskDetail extends Task {
@@ -81,6 +115,7 @@ export interface TaskListQuery {
   assigneeId?: number;
   tagId?: number;
   priority?: TaskPriority;
+  channel?: TaskChannel;
   q?: string;
   dueBefore?: string;
   dueAfter?: string;
@@ -109,6 +144,8 @@ export interface CreateTaskInput {
   assigneeId?: number | null;
   dueDate?: string | null;
   tagIds?: number[];
+  channel?: TaskChannel | null;
+  link?: string | null;
 }
 
 export interface UpdateTaskInput {
@@ -121,6 +158,8 @@ export interface UpdateTaskInput {
   dueDate?: string | null;
   position?: number;
   tagIds?: number[];
+  channel?: TaskChannel | null;
+  link?: string | null;
 }
 
 export interface ReorderInput {

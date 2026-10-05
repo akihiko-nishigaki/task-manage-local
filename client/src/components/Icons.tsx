@@ -162,3 +162,10 @@ export const IconLock = (p: Props) => (
     <path d="M8 10V7a4 4 0 0 1 8 0v3" />
   </Base>
 );
+
+export const IconLink = (p: Props) => (
+  <Base {...p}>
+    <path d="M10 13a5 5 0 0 0 7.1 0l3-3a5 5 0 0 0-7.1-7.1L11.5 4.4" />
+    <path d="M14 11a5 5 0 0 0-7.1 0l-3 3a5 5 0 0 0 7.1 7.1l1.5-1.5" />
+  </Base>
+);

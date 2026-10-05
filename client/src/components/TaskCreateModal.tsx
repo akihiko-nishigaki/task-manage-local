@@ -1,6 +1,14 @@
 import { useState } from 'react';
-import type { CreateTaskInput, TaskPriority, TaskStatus } from '@shared/types';
-import { PRIORITY_LABELS, STATUS_LABELS, TASK_PRIORITIES, TASK_STATUSES } from '@shared/types';
+import type { CreateTaskInput, TaskChannel, TaskPriority, TaskStatus } from '@shared/types';
+import {
+  CHANNEL_LABELS,
+  isSafeLink,
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  TASK_CHANNELS,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+} from '@shared/types';
 import { useStore } from '../store';
 import { Modal } from './Modal';
 import { TagSelect } from './TagSelect';
@@ -25,6 +33,9 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
   const [assigneeId, setAssigneeId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState('');
   const [tagIds, setTagIds] = useState<number[]>([]);
+  const [channel, setChannel] = useState<TaskChannel | ''>('');
+  const [link, setLink] = useState('');
+  const linkInvalid = link.trim() !== '' && !isSafeLink(link);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
@@ -39,6 +50,8 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
       priority,
       assigneeId,
       dueDate: dueDate || null,
+      channel: channel || null,
+      link: link.trim() || null,
       tagIds,
     };
     const created = await createTask(input);
@@ -63,7 +76,7 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
             type="button"
             className="btn btn-primary"
             onClick={submit}
-            disabled={!title.trim() || projectId === null || busy}
+            disabled={!title.trim() || projectId === null || busy || linkInvalid}
           >
             作成
           </button>
@@ -155,6 +168,41 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
           />
+        </div>
+      </div>
+
+      <div className="field-row">
+        <div className="field">
+          <label htmlFor="t-channel">チャネル</label>
+          <select
+            id="t-channel"
+            value={channel}
+            onChange={(e) => setChannel(e.target.value as TaskChannel | '')}
+          >
+            <option value="">未設定</option>
+            {TASK_CHANNELS.map((c) => (
+              <option key={c} value={c}>
+                {CHANNEL_LABELS[c]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="t-link">リンク</label>
+          <input
+            id="t-link"
+            type="url"
+            inputMode="url"
+            placeholder="https://… / mailto:…（任意）"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            aria-invalid={linkInvalid ? true : undefined}
+          />
+          {linkInvalid ? (
+            <p className="field-hint warn">
+              http:// https:// mailto: msteams: のいずれかで始まるリンクを入力してください。
+            </p>
+          ) : null}
         </div>
       </div>
 
