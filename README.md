@@ -50,23 +50,26 @@ npm run build:installer
 
 この zip を社内の共有フォルダなどに置いて配布してください。
 サーバー側は 1 ファイルにまとめてあるため、配布物に `node_modules` は含まれません。
-zip の中身はフォルダ無しで次のとおり並びます。
+zip を展開すると、フォルダを辿らずに済むよう次の 4 つだけが並びます。
+アプリ本体は `program.zip` にまとめてあり、`install.ps1` が展開します。
 
 ```
-install.bat / install.ps1        ← install.bat をダブルクリック
-uninstall.bat / uninstall.ps1
-stop.bat / stop.ps1
-README.txt                       ← 受け取る人向けの手順
-server.cjs  launch.cjs  TaskManage.vbs  app.ico  VERSION  web/   ← アプリ本体
+install.bat     ← これをダブルクリック
+install.ps1     install.bat が呼び出す本体
+program.zip     アプリ一式（server.cjs / launch.cjs / TaskManage.vbs / web/ など）
+README.txt      受け取る人向けの手順
 ```
+
+インストール先には `program.zip` の中身が展開されます。`install.bat` と `install.ps1` は
+インストール先には置きません（配布 zip からのみ実行する運用にするため）。
 
 ### 受け取る側
 
 1. zip を「すべて展開」し、展開したフォルダの `install.bat` をダブルクリックする
    - 確認の質問は無い。アプリ一式を `%LOCALAPPDATA%\Programs\TaskManage` にコピーし、デスクトップとスタートメニューに「タスク管理」のショートカットを作り、「設定 > アプリ」に登録して起動する
-   - `install.bat` は最後に必ず一時停止するので、コピー元 / コピー先とインストールされた版（`VERSION`）を確認してからウィンドウを閉じる
-   - 新しい版に入れ替えるときも同じ手順（起動中なら止めてから上書きする。データには触らない）
-   - インストール済みフォルダの `install.bat` を実行しても、コピー元と先が同じためファイルは入れ替わらない（黄色で「コピー元とコピー先が同じです」と出る）
+   - `install.bat` は最後に必ず一時停止するので、インストール元 / 先とインストールされた版（`VERSION`）を確認してからウィンドウを閉じる
+   - 新しい版に入れ替えるときも同じ手順（起動中なら止めてから入れ替える。データには触らない）
+   - `program.zip` が隣に無い場合はその旨を表示して中断する（zip を展開せずに実行した場合）
 2. 消すときは「設定 > アプリ」または インストール先の `uninstall.bat`（ショートカット・登録・アプリのフォルダを消す。データは残る）
 
 オプションを付けるときは PowerShell で `install.ps1` / `uninstall.ps1` を直接実行します（`.bat` に引数を付けても同じ）。

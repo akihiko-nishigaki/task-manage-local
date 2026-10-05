@@ -24,8 +24,12 @@
     インストール先: %LOCALAPPDATA%\Programs\TaskManage
 
   新しい版に入れ替えるときも同じ手順です（上書きされます。データには触りません）。
-  インストール済みフォルダの install.bat を実行してもファイルは入れ替わりません。
-  必ず新しい zip を展開したフォルダの install.bat を実行してください。
+
+  展開したフォルダには次の 4 つだけが入っています。
+    install.bat   これをダブルクリックします
+    install.ps1   install.bat が呼び出します
+    program.zip   アプリ本体（install.bat が展開します）
+    README.txt    この説明書
 
   オプションを付けたいときは PowerShell で install.ps1 を実行します。
     powershell -ExecutionPolicy Bypass -File install.ps1 -Startup

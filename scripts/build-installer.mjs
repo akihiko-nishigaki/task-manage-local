@@ -1,8 +1,9 @@
 // Windows 向けインストーラー一式を組み立てる。
 // 出力: dist-installer/TaskManage-Setup-v<version>.zip
 // サーバーは 1 ファイルにバンドルするため、配布物に node_modules は含まれない。
-// zip の中身はアプリ一式 + install.bat / install.ps1 / uninstall.bat / uninstall.ps1 + README.txt を
-// フォルダ無しで並べたもの。受け取った側は展開して install.bat を実行する（ABS-Anken-Manage と同じ形式）。
+// 配布 zip を展開すると install.bat / install.ps1 / program.zip / README.txt の 4 つだけが並ぶ。
+// アプリ本体は program.zip にまとめてあり、install.ps1 が展開してインストールする。
+// フォルダを辿らずに install.bat へ届くようにするための構成。
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -15,7 +16,9 @@ const templates = path.join(root, 'installer', 'templates');
 const outRoot = path.join(root, 'dist-installer');
 const version = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 const stageName = `TaskManage-Setup-v${version}`;
-const appDir = path.join(outRoot, stageName);
+// stageDir: 配布 zip の中身（install.bat などが並ぶ）/ appDir: program.zip に詰めるアプリ本体
+const stageDir = path.join(outRoot, stageName);
+const appDir = path.join(outRoot, '.payload');
 
 function log(msg) {
   console.log(`▶ ${msg}`);
@@ -256,12 +259,13 @@ await esbuild.build({
 log('画面ファイルをコピーしています');
 cpSync(path.join(root, 'client', 'dist'), path.join(appDir, 'web'), { recursive: true });
 
-log('起動用ファイルとインストーラーを書き出しています');
+log('起動用ファイルを書き出しています');
 const tpl = (name) => readFileSync(path.join(templates, name), 'utf8');
 writeFileSync(path.join(appDir, 'launch.cjs'), readFileSync(path.join(templates, 'launch.cjs')));
 writeVbs(path.join(appDir, 'TaskManage.vbs'), tpl('TaskManage.vbs'));
-for (const name of ['install.bat', 'uninstall.bat', 'stop.bat']) writeBat(path.join(appDir, name), tpl(name));
-for (const name of ['install.ps1', 'uninstall.ps1', 'stop.ps1', 'README.txt']) writeUtf8Bom(path.join(appDir, name), tpl(name));
+// インストール先に入るのは「使う側」のファイルだけ。install.* は program.zip には入れない
+for (const name of ['uninstall.bat', 'stop.bat']) writeBat(path.join(appDir, name), tpl(name));
+for (const name of ['uninstall.ps1', 'stop.ps1', 'README.txt']) writeUtf8Bom(path.join(appDir, name), tpl(name));
 writeFileSync(path.join(appDir, 'VERSION'), `${version}
 `);
 
@@ -269,7 +273,7 @@ log('アイコンを生成しています');
 writeFileSync(path.join(appDir, 'app.ico'), buildIco([16, 32, 48, 64]));
 if (process.env.ICON_PREVIEW) writeFileSync(process.env.ICON_PREVIEW, buildPng(128));
 
-log('配布用 zip を書き出しています');
+log('アプリ本体を program.zip にまとめています');
 /** dir 以下を再帰的に集める。 */
 function collect(dir, prefix, out = []) {
   for (const name of readdirSync(dir).sort()) {
@@ -285,9 +289,23 @@ function collect(dir, prefix, out = []) {
   return out;
 }
 
+mkdirSync(stageDir, { recursive: true });
+writeFileSync(path.join(stageDir, 'program.zip'), createZip(collect(appDir, '')));
+rmSync(appDir, { recursive: true, force: true });
+
+log('インストーラーと説明書を書き出しています');
+writeBat(path.join(stageDir, 'install.bat'), tpl('install.bat'));
+// install.ps1 には配布物のバージョンを埋め込む（VERSION は program.zip の中にあるため）
+writeUtf8Bom(
+  path.join(stageDir, 'install.ps1'),
+  tpl('install.ps1').replace("$SrcVersion = '0.0.0'", `$SrcVersion = '${version}'`),
+);
+writeUtf8Bom(path.join(stageDir, 'README.txt'), tpl('README.txt'));
+
+log('配布用 zip を書き出しています');
 // zip の一番上にフォルダを作らず、展開したフォルダの直下に install.bat が来るようにする
 const zipPath = path.join(outRoot, `${stageName}.zip`);
-writeFileSync(zipPath, createZip(collect(appDir, '')));
+writeFileSync(zipPath, createZip(collect(stageDir, '')));
 
 console.log(`
 ✔ 完成しました: ${path.relative(root, zipPath)}`);

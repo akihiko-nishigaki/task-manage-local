@@ -1,5 +1,6 @@
 # タスク管理 インストーラ
-# このフォルダ（配布 ZIP を展開した場所）のアプリ一式をローカル PC にコピーし、デスクトップとスタートメニューにショートカットを作ります。
+# このフォルダ（配布 ZIP を展開した場所）の program.zip を展開してローカル PC にインストールし、
+# デスクトップとスタートメニューにショートカットを作ります。
 # 通常は install.bat をダブルクリックして使います。
 #   -Dest        インストール先（既定: %LOCALAPPDATA%\Programs\TaskManage）
 #   -ShortcutDir ショートカットを置く場所（既定: デスクトップ）。-NoShortcut で作らない
@@ -39,20 +40,19 @@ function Get-AppVersion([string]$dir) {
   if ($s) { return 'v' + $s } else { return '(不明)' }
 }
 $src = Split-Path -Parent $MyInvocation.MyCommand.Path
-# 配布に含める（= 動作に必要な）ファイルとフォルダ
-$files = @('server.cjs', 'launch.cjs', 'TaskManage.vbs', 'app.ico', 'VERSION', 'stop.bat', 'stop.ps1',
-  'install.bat', 'install.ps1', 'uninstall.bat', 'uninstall.ps1', 'README.txt')
-$dirs = @('web')
-# 旧形式のインストーラ（v0.2.1 以前）が置いていたファイル。残っていても害はないが紛らわしいので消す
-$obsolete = @('setup.ps1')
+$payload = Join-Path $src 'program.zip'
+# 配布物のバージョン。VERSION は program.zip の中なので、ビルド時にここへ埋め込む
+$SrcVersion = '0.0.0'
+# 旧形式のインストーラ（v0.2.2 以前）が置いていたファイル。残っていても害はないが紛らわしいので消す
+$obsolete = @('setup.ps1', 'install.bat', 'install.ps1')
 
 Write-Host "$AppName をインストールします"
-Write-Host "  コピー元: $src    $(Get-AppVersion $src)"
-Write-Host "  コピー先: $Dest    $(Get-AppVersion $Dest)"
-Write-Host "  データ  : $DataDir（アンインストールしても消えません）"
+Write-Host "  インストール元: $src    v$SrcVersion"
+Write-Host "  インストール先: $Dest    $(Get-AppVersion $Dest)"
+Write-Host "  データ        : $DataDir（アンインストールしても消えません）"
 
-foreach ($f in @('server.cjs', 'launch.cjs', 'TaskManage.vbs') + $dirs) {
-  if (-not (Test-Path (Join-Path $src $f))) { throw "コピー元に $f がありません。配布 ZIP を展開したフォルダの install.bat を実行してください" }
+if (-not (Test-Path $payload)) {
+  throw "同じフォルダに program.zip がありません。配布 ZIP を「すべて展開」したフォルダの install.bat を実行してください"
 }
 
 # サーバーは Node.js で動く（node:sqlite を使うため 22.13 以上）
@@ -66,32 +66,36 @@ if ([version]::TryParse(($nodeVer -replace '-.*$', ''), [ref]$parsed) -and $pars
 }
 Write-Host "  Node.js : v$nodeVer"
 
-$copied = $true
-if ($src.TrimEnd('\') -ieq $Dest.TrimEnd('\')) {
-  $copied = $false
-  Write-Host ''
-  Write-Host '  *** 注意: コピー元とコピー先が同じです。ファイルは入れ替わりません ***' -ForegroundColor Yellow
-  Write-Host '      新しい版に入れ替えるときは、配布 ZIP を展開したフォルダの install.bat を' -ForegroundColor Yellow
-  Write-Host '      実行してください（インストール済みフォルダの install.bat では更新されません）。' -ForegroundColor Yellow
-  Write-Host ''
-} else {
-  # 起動中だとファイルを入れ替えても古い版が動き続けるので、先に止める
-  if (Test-Path (Join-Path $Dest 'app.pid')) { & (Join-Path $src 'stop.ps1') -Dest $Dest }
-  New-Item -ItemType Directory -Force -Path $Dest | Out-Null
-  foreach ($f in $files) {
-    $p = Join-Path $src $f
-    if (Test-Path $p) { Copy-Item -Path $p -Destination (Join-Path $Dest $f) -Force }
-  }
-  foreach ($d in $dirs) {
-    $to = Join-Path $Dest $d
-    if (Test-Path $to) { Remove-Item -Recurse -Force $to }   # 古い版のファイルを残さない
-    Copy-Item -Path (Join-Path $src $d) -Destination $to -Recurse -Force
-  }
-  foreach ($f in $obsolete) {
-    $p = Join-Path $Dest $f
-    if (Test-Path $p) { Remove-Item -Force $p }
-  }
-  Write-Host '  ファイルをコピーしました'
+# 起動中だとファイルを入れ替えても古い版が動き続けるので、先に止める
+if (Test-Path (Join-Path $Dest 'app.pid')) {
+  $stopPs1 = Join-Path $Dest 'stop.ps1'
+  if (Test-Path $stopPs1) { & $stopPs1 -Dest $Dest }
+}
+New-Item -ItemType Directory -Force -Path $Dest | Out-Null
+# 古い版のファイルを残さないよう、画面ファイルは入れ替える前に消す
+$webDir = Join-Path $Dest 'web'
+if (Test-Path $webDir) { Remove-Item -Recurse -Force $webDir }
+
+# program.zip を展開する。Expand-Archive が使えない環境では Windows 標準の tar を使う
+$unpacked = $false
+try {
+  Expand-Archive -LiteralPath $payload -DestinationPath $Dest -Force
+  $unpacked = Test-Path (Join-Path $Dest 'server.cjs')
+} catch {
+  $unpacked = $false
+}
+if (-not $unpacked -and (Get-Command tar -ErrorAction SilentlyContinue)) {
+  & tar -xf $payload -C $Dest
+  $unpacked = Test-Path (Join-Path $Dest 'server.cjs')
+}
+if (-not $unpacked) {
+  throw "program.zip を展開できませんでした。program.zip を手動で $Dest に展開してから、TaskManage.vbs をダブルクリックしてください"
+}
+Write-Host '  ファイルを展開しました'
+
+foreach ($f in $obsolete) {
+  $p = Join-Path $Dest $f
+  if (Test-Path $p) { Remove-Item -Force $p }
 }
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
 
@@ -133,12 +137,7 @@ $icon = Join-Path $Dest 'app.ico'
 if (Test-Path $icon) { Set-ItemProperty -Path $RegPath -Name 'DisplayIcon' -Value $icon }
 
 Write-Host ''
-if ($copied) {
-  Write-Host "インストールが完了しました。バージョン $destVer" -ForegroundColor Green
-} else {
-  Write-Host "ファイルは入れ替えていません。今入っているのは $destVer です" -ForegroundColor Yellow
-  Write-Host "  ショートカットの作り直しだけ行いました。" -ForegroundColor Yellow
-}
+Write-Host "インストールが完了しました。バージョン $destVer" -ForegroundColor Green
 Write-Host "  インストール先: $Dest"
 Write-Host "  データ保存先  : $DataDir"
 Write-Host ''
