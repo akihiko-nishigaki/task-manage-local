@@ -10,6 +10,8 @@ param(
   [string]$ShortcutDir = [Environment]::GetFolderPath('Desktop'),
   [switch]$RemoveData
 )
+# 日本語が文字化けしないよう、出力の文字コードをコンソールと揃える（install.bat 側で chcp 65001 済み）
+try { [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false } catch { }
 $ErrorActionPreference = 'Stop'
 $AppName = 'タスク管理'
 $RegPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\TaskManage'

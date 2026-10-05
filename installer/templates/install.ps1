@@ -14,6 +14,8 @@ param(
   [switch]$Startup,
   [switch]$NoLaunch
 )
+# 日本語が文字化けしないよう、出力の文字コードをコンソールと揃える（install.bat 側で chcp 65001 済み）
+try { [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false } catch { }
 $ErrorActionPreference = 'Stop'
 $AppName = 'タスク管理'
 $RegPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\TaskManage'
@@ -23,6 +25,8 @@ trap {
   Write-Host ''
   Write-Host '*** インストールに失敗しました ***' -ForegroundColor Red
   Write-Host $_.Exception.Message -ForegroundColor Red
+  # 問い合わせ時に原因を特定できるよう、どの行で止まったかも出す
+  if ($_.InvocationInfo) { Write-Host ('  (install.ps1 ' + $_.InvocationInfo.ScriptLineNumber + ' 行目)') -ForegroundColor DarkGray }
   Write-Host ''
   Write-Host '配布 ZIP を展開したフォルダの install.bat を実行しているか確認してください。'
   exit 1

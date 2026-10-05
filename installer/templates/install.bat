@@ -1,4 +1,6 @@
 @echo off
+rem Use UTF-8 so the Japanese messages printed by the .ps1 are not garbled.
+chcp 65001 >nul
 rem Installer: copies this app to the local PC and creates desktop / Start Menu shortcuts.
 rem Usage: double-click. (Options are in install.ps1: -Dest, -NoShortcut, -NoStartMenu, -Startup, -NoLaunch)
 rem Keep this file ASCII-only: Japanese here would be garbled by the cmd code page.
