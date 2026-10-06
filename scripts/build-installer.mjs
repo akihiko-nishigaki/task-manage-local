@@ -1,7 +1,8 @@
 // Windows 向けインストーラー一式を組み立てる。
 // 出力: dist-installer/TaskManage-Setup-v<version>.zip
 // サーバーは 1 ファイルにバンドルするため、配布物に node_modules は含まれない。
-// 配布 zip を展開すると install.bat / install.ps1 / program.zip / README.txt の 4 つだけが並ぶ。
+// 配布 zip を展開すると install.bat / install.ps1 / install-server.bat / install-server.ps1 /
+// program.zip / README.txt が並ぶ。1 人で使うなら install.bat、社内で共有するなら install-server.bat。
 // アプリ本体は program.zip にまとめてあり、install.ps1 が展開してインストールする。
 // フォルダを辿らずに install.bat へ届くようにするための構成。
 import { spawnSync } from 'node:child_process';
@@ -295,6 +296,8 @@ rmSync(appDir, { recursive: true, force: true });
 
 log('インストーラーと説明書を書き出しています');
 writeBat(path.join(stageDir, 'install.bat'), tpl('install.bat'));
+writeBat(path.join(stageDir, 'install-server.bat'), tpl('install-server.bat'));
+writeUtf8Bom(path.join(stageDir, 'install-server.ps1'), tpl('install-server.ps1'));
 // install.ps1 には配布物のバージョンを埋め込む（VERSION は program.zip の中にあるため）
 writeUtf8Bom(
   path.join(stageDir, 'install.ps1'),

@@ -124,6 +124,8 @@ export function createDb(location: string): Db {
   const db = new DatabaseSync(location);
   if (location !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
   db.exec('PRAGMA foreign_keys = ON;');
+  // 複数人で同時に使うと書き込みがぶつかる。すぐ諦めず 5 秒待ってから失敗させる
+  db.exec('PRAGMA busy_timeout = 5000;');
   migrate(db);
   return db;
 }

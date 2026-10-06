@@ -191,6 +191,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshAll]);
 
+  // 複数人で使うとき、他の人の変更を取り込むために定期的に読み直す。
+  // 画面を見ていないときは動かさず、タブに戻ったときはすぐ最新にする。
+  useEffect(() => {
+    if (!ready) return;
+    let stopped = false;
+    const sync = () => {
+      if (stopped || document.hidden) return;
+      // 失敗しても画面は現状のままにする（通信が一時的に途切れただけのことがあるため）
+      void refreshAll().catch(() => undefined);
+    };
+    const onVisible = () => {
+      if (!document.hidden) sync();
+    };
+    const timer = window.setInterval(sync, 20_000);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [ready, refreshAll]);
+
   // 保存されている現在ユーザーが存在しなければクリアする
   useEffect(() => {
     if (currentUserId === null || members.length === 0) return;

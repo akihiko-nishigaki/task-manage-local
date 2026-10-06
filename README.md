@@ -16,6 +16,30 @@
 
 - Node.js 22.13 以上（SQLite は Node.js 内蔵の `node:sqlite` を使用。追加のネイティブビルド不要）
 
+## 社内で共有して使う（複数人）
+
+常時起動しておく Windows PC を 1 台決めて、そこで `install-server.bat` を実行します。
+管理者として実行すると、サインイン前から動くようになり、ファイアウォールも自動で開きます。
+
+| 項目 | 内容 |
+| --- | --- |
+| 待ち受け | `0.0.0.0:3000`（`-Port` で変更可） |
+| 自動起動 | タスクスケジューラの `TaskManage Server`。管理者なら起動時、一般ユーザーならサインイン時 |
+| 設定ファイル | インストール先の `server.json`（`launch.cjs` が読む）。更新しても残る |
+| 利用者側 | インストール不要。配られた `.url` ショートカットかブックマークを開くだけ |
+| 想定人数 | 10 人程度。SQLite は WAL + `busy_timeout` 5 秒で同時書き込みに備える |
+
+画面は 20 秒ごとと、タブに戻ったときに自動で読み直すので、他の人の変更が反映されます。
+
+### データを共有フォルダに置かない理由
+
+`tasks.db` を共有フォルダや NAS に置き、複数の PC から直接読み書きする構成は**使えません**。
+SQLite はネットワーク越しのファイルロックが正しく働かず、データ破損の原因になります。
+WAL モードはそもそもファイル共有上では動作しません。
+
+データはサーバー役の PC 内（`%LOCALAPPDATA%\task-manage-local\data`）に置き、
+共有フォルダにはバックアップをコピーする運用にしてください。
+
 ## やり取りのチャネルとリンク
 
 タスクごとに「どこでやり取りしているか」を記録できます。チャネルは メール / Teams / 口頭 から選びます。
@@ -54,10 +78,12 @@ zip を展開すると、フォルダを辿らずに済むよう次の 4 つだ�
 アプリ本体は `program.zip` にまとめてあり、`install.ps1` が展開します。
 
 ```
-install.bat     ← これをダブルクリック
-install.ps1     install.bat が呼び出す本体
-program.zip     アプリ一式（server.cjs / launch.cjs / TaskManage.vbs / web/ など）
-README.txt      受け取る人向けの手順
+install.bat            ← 1 人で使う場合。これをダブルクリック
+install.ps1            install.bat が呼び出す本体
+install-server.bat     ← 社内で共有する場合。サーバー役の PC で実行
+install-server.ps1     install-server.bat が呼び出す本体
+program.zip            アプリ一式（server.cjs / launch.cjs / TaskManage.vbs / web/ など）
+README.txt             受け取る人向けの手順
 ```
 
 インストール先には `program.zip` の中身が展開されます。`install.bat` と `install.ps1` は

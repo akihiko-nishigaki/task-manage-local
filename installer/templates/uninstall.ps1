@@ -16,6 +16,15 @@ $ErrorActionPreference = 'Stop'
 $AppName = 'タスク管理'
 $RegPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\TaskManage'
 $DataRoot = Join-Path $env:LOCALAPPDATA 'task-manage-local'
+$TaskName = 'TaskManage Server'   # 社内共有サーバーとして設定した場合の自動起動タスク
+
+# 社内共有サーバーとして設定していた場合は、先に自動起動を解除する（止めても復活しないように）
+if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+  Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+  Write-Host '  共有サーバーの自動起動を解除しました'
+}
+Remove-NetFirewallRule -DisplayName "$AppName ($TaskName)" -ErrorAction SilentlyContinue
 
 $stop = Join-Path $Dest 'stop.ps1'
 if (Test-Path $stop) { & $stop -Dest $Dest }

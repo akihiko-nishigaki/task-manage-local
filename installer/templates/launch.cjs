@@ -7,9 +7,31 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 const APP_DIR = __dirname;
+
+/**
+ * server.json があれば社内共有サーバーとしての設定を読む（install-server.ps1 が作る）。
+ * 無ければ 1 人で使う構成（自分の PC からだけ、ブラウザを開く）。
+ */
+function readServerConfig() {
+  try {
+    const raw = fs.readFileSync(path.join(APP_DIR, 'server.json'), 'utf8');
+    const conf = JSON.parse(raw);
+    const host = typeof conf.host === 'string' && conf.host ? conf.host : '127.0.0.1';
+    const port = Number.isInteger(conf.port) ? conf.port : 3000;
+    return { host, port, shared: host !== '127.0.0.1' };
+  } catch {
+    return { host: '127.0.0.1', port: 3000, shared: false };
+  }
+}
+
+const CONF = readServerConfig();
+// 待ち受けるアドレス。共有サーバーでは LAN 全体（0.0.0.0）。
+const BIND_HOST = CONF.host;
+// 疎通確認やブラウザを開くときに使うアドレス。0.0.0.0 は宛先に使えないので自分自身を指す。
 const HOST = '127.0.0.1';
-const BASE_PORT = Number(process.env.TASKMANAGE_PORT || process.env.PORT || 3000);
-const PORT_TRIES = 20;
+const BASE_PORT = Number(process.env.TASKMANAGE_PORT || process.env.PORT || CONF.port);
+// 共有サーバーはポートを決め打ちにする（配ったアドレスが変わると困るため）
+const PORT_TRIES = CONF.shared ? 1 : 20;
 
 // データの保存先はサーバー側（dataDir.ts）が OS ごとに決める。
 // ここでは場所を重複して定義せず、停止用の PID ファイルだけをアプリのフォルダに置く。
@@ -36,7 +58,7 @@ function isPortFree(port) {
     const srv = net.createServer();
     srv.once('error', () => resolve(false));
     srv.once('listening', () => srv.close(() => resolve(true)));
-    srv.listen(port, HOST);
+    srv.listen(port, BIND_HOST);
   });
 }
 
@@ -59,7 +81,7 @@ async function main() {
   // 1. 既に動いているインスタンスがあれば、それを開くだけで終わる
   for (let p = BASE_PORT; p < BASE_PORT + PORT_TRIES; p += 1) {
     if (await isOurApp(p)) {
-      openBrowser(`http://${HOST}:${p}`);
+      if (!CONF.shared) openBrowser(`http://${HOST}:${p}`);
       return;
     }
   }
@@ -75,12 +97,16 @@ async function main() {
     port += 1;
   }
   if (!found) {
-    console.error(`ポート ${BASE_PORT} 〜 ${port} がすべて使用中です。`);
+    console.error(
+      CONF.shared
+        ? `ポート ${BASE_PORT} が使用中です。ほかのアプリを止めるか、install-server.bat の -Port で変更してください。`
+        : `ポート ${BASE_PORT} 〜 ${port} がすべて使用中です。`,
+    );
     process.exit(1);
   }
 
   // 3. サーバーを同じプロセスで起動する
-  process.env.HOST = HOST;
+  process.env.HOST = BIND_HOST;
   process.env.PORT = String(port);
   process.env.WEB_DIR = path.join(APP_DIR, 'web');
   require(path.join(APP_DIR, 'server.cjs'));
@@ -105,7 +131,7 @@ async function main() {
   const url = `http://${HOST}:${port}`;
   for (let i = 0; i < 80; i += 1) {
     if (await isOurApp(port)) {
-      openBrowser(url);
+      if (!CONF.shared) openBrowser(url);
       return;
     }
     await sleep(250);
