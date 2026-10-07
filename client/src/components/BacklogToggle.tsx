@@ -13,10 +13,10 @@ export function BacklogToggle({ show, onChange, count }: Props) {
       className={`btn btn-sm backlog-toggle${show ? ' is-on' : ''}`}
       aria-pressed={show}
       onClick={() => onChange(!show)}
-      title={show ? 'プロダクトバックログの列を隠します' : 'プロダクトバックログの列を表示します'}
+      title={show ? 'バックログの列を隠します' : 'バックログの列を表示します'}
     >
       <span className="col-dot col-backlog" aria-hidden="true" />
-      プロダクトバックログ {show ? '非表示' : '表示'}
+      バックログ{show ? 'を隠す' : 'を表示'}
       <span className="backlog-toggle-count">{count}</span>
     </button>
   );

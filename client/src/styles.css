@@ -650,6 +650,7 @@ textarea {
 
 .card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
@@ -657,6 +658,7 @@ textarea {
 }
 
 .card-head h2 {
+  white-space: nowrap;
   font-size: 14px;
   flex: 1;
 }
@@ -866,7 +868,8 @@ textarea {
 
 .kanban {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  overflow-x: auto;
   gap: 12px;
   align-items: start;
   min-height: 100%;
@@ -1563,7 +1566,7 @@ textarea {
 
 /* バックログ列を隠している間は 4 列。レスポンシブ側でも同じ詳細度で上書きする */
 .kanban.cols-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
 }
 
 .kanban-toolbar {

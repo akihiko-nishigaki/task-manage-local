@@ -220,7 +220,7 @@ export function ListView({ tasks, onOpenTask }: Props) {
                     <Assignee member={memberById(t.assigneeId)} />
                   </td>
                   <td>
-                    <DueDate due={t.dueDate} done={t.status === 'done'} />
+                    <DueDate due={t.dueDate} done={t.status === 'done' || t.status === 'backlog'} />
                   </td>
                   <td>
                     <span className="cell-channel">

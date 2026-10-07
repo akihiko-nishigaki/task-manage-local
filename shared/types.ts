@@ -7,7 +7,7 @@ export const TASK_STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'r
 export const TASK_PRIORITIES: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 
 export const STATUS_LABELS: Record<TaskStatus, string> = {
-  backlog: 'プロダクトバックログ',
+  backlog: 'バックログ',
   todo: '未着手',
   in_progress: '進行中',
   review: 'レビュー',
