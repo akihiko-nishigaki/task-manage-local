@@ -5,6 +5,8 @@ import { useStore } from '../store';
 import { Assignee, ChannelBadge, PriorityBadge, TagChip, TaskLink } from '../components/Badges';
 import { IconArchive, IconPlus } from '../components/Icons';
 import { formatDueShort, isOverdue, isToday } from '../utils/date';
+import { BacklogToggle } from '../components/BacklogToggle';
+import { useShowBacklog, visibleStatuses } from '../utils/backlogVisibility';
 
 interface Props {
   tasks: Task[];
@@ -28,6 +30,7 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
   const [quickAddCol, setQuickAddCol] = useState<TaskStatus | null>(null);
   const [quickAddText, setQuickAddText] = useState('');
   const quickBusy = useRef(false);
+  const [showBacklog, setShowBacklog] = useShowBacklog();
 
   // 単一プロジェクトのボードではカード上のプロジェクト名は冗長なので隠す
   const multiProject = useMemo(() => new Set(tasks.map((t) => t.projectId)).size > 1, [tasks]);
@@ -132,8 +135,12 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
   };
 
   return (
-    <div className="kanban">
-      {TASK_STATUSES.map((status) => {
+    <>
+    <div className="kanban-toolbar">
+      <BacklogToggle show={showBacklog} onChange={setShowBacklog} count={columns.get('backlog')?.length ?? 0} />
+    </div>
+    <div className={`kanban${showBacklog ? '' : ' cols-4'}`}>
+      {visibleStatuses(showBacklog).map((status) => {
         const items = columns.get(status) ?? [];
         return (
           <section
@@ -288,5 +295,6 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
         );
       })}
     </div>
+    </>
   );
 }

@@ -38,12 +38,13 @@ import {
   requireNullableLink,
 } from '../validate.js';
 
-// ステータスはカンバンの列順（todo → in_progress → review → done）で並べる
+// ステータスはカンバンの列順（backlog → todo → in_progress → review → done）で並べる
 const STATUS_ORDER = `CASE status
-  WHEN 'todo' THEN 0
-  WHEN 'in_progress' THEN 1
-  WHEN 'review' THEN 2
-  ELSE 3 END`;
+  WHEN 'backlog' THEN 0
+  WHEN 'todo' THEN 1
+  WHEN 'in_progress' THEN 2
+  WHEN 'review' THEN 3
+  ELSE 4 END`;
 
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);

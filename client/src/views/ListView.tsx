@@ -14,7 +14,13 @@ import { Assignee, ChannelBadge, DueDate, PriorityBadge, TagList, TaskLink } fro
 type SortKey = 'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'position';
 
 const PRIORITY_ORDER: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-const STATUS_ORDER: Record<TaskStatus, number> = { todo: 0, in_progress: 1, review: 2, done: 3 };
+const STATUS_ORDER: Record<TaskStatus, number> = {
+  backlog: 0,
+  todo: 1,
+  in_progress: 2,
+  review: 3,
+  done: 4,
+};
 
 interface Props {
   tasks: Task[];

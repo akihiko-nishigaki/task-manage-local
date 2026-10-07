@@ -7,6 +7,8 @@ export type Db = DatabaseSync;
 interface Migration {
   version: number;
   sql: string;
+  /** テーブル作り直しなど、外部キー制約を一時的に切って実行する必要があるもの */
+  withoutForeignKeys?: boolean;
 }
 
 const MIGRATIONS: Migration[] = [
@@ -92,6 +94,47 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_tasks_channel ON tasks(channel);
     `,
   },
+  {
+    // ステータスに 'backlog'（プロダクトバックログ）を追加。
+    // SQLite は CHECK 制約を ALTER できないので tasks を作り直す。
+    // 子テーブル（task_tags / comments）の ON DELETE CASCADE を発火させないため、外部キーを切って行う。
+    version: 4,
+    withoutForeignKeys: true,
+    sql: `
+      CREATE TABLE tasks_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'todo'
+          CHECK (status IN ('backlog', 'todo', 'in_progress', 'review', 'done')),
+        priority TEXT NOT NULL DEFAULT 'medium'
+          CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+        assignee_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+        due_date TEXT,
+        position REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        archived_at TEXT,
+        channel TEXT,
+        link TEXT
+      );
+      INSERT INTO tasks_new (id, project_id, title, description, status, priority, assignee_id, due_date,
+                             position, created_at, updated_at, completed_at, archived_at, channel, link)
+        SELECT id, project_id, title, description, status, priority, assignee_id, due_date,
+               position, created_at, updated_at, completed_at, archived_at, channel, link
+        FROM tasks;
+      DROP TABLE tasks;
+      ALTER TABLE tasks_new RENAME TO tasks;
+      CREATE INDEX idx_tasks_project_id ON tasks(project_id);
+      CREATE INDEX idx_tasks_status ON tasks(status);
+      CREATE INDEX idx_tasks_assignee_id ON tasks(assignee_id);
+      CREATE INDEX idx_tasks_due_date ON tasks(due_date);
+      CREATE INDEX idx_tasks_archived_at ON tasks(archived_at);
+      CREATE INDEX idx_tasks_channel ON tasks(channel);
+    `,
+  },
 ];
 
 function migrate(db: Db): void {
@@ -104,9 +147,15 @@ function migrate(db: Db): void {
   );
   for (const migration of MIGRATIONS) {
     if (applied.has(migration.version)) continue;
+    // PRAGMA foreign_keys はトランザクション内では効かないので BEGIN の外で切り替える
+    if (migration.withoutForeignKeys) db.exec('PRAGMA foreign_keys = OFF;');
     db.exec('BEGIN');
     try {
       db.exec(migration.sql);
+      if (migration.withoutForeignKeys) {
+        const violations = db.prepare('PRAGMA foreign_key_check').all();
+        if (violations.length > 0) throw new Error(`マイグレーション ${migration.version} で外部キー違反が発生しました`);
+      }
       db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(
         migration.version,
         new Date().toISOString(),
@@ -115,6 +164,8 @@ function migrate(db: Db): void {
     } catch (error) {
       db.exec('ROLLBACK');
       throw error;
+    } finally {
+      if (migration.withoutForeignKeys) db.exec('PRAGMA foreign_keys = ON;');
     }
   }
 }

@@ -1,12 +1,13 @@
 // 共有型定義: サーバー・クライアント双方がこのファイルを正とする。
 
-export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
+export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
-export const TASK_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'review', 'done'];
+export const TASK_STATUSES: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'review', 'done'];
 export const TASK_PRIORITIES: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 
 export const STATUS_LABELS: Record<TaskStatus, string> = {
+  backlog: 'プロダクトバックログ',
   todo: '未着手',
   in_progress: '進行中',
   review: 'レビュー',

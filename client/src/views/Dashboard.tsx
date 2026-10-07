@@ -5,6 +5,8 @@ import { useStore } from '../store';
 import { Assignee, ChannelBadge, PriorityBadge, StatusBadge, TaskLink } from '../components/Badges';
 import { IconAlert, IconBoard, IconCalendar, IconUser } from '../components/Icons';
 import { describeDue, formatDueShort, isOverdue, isWithinDays } from '../utils/date';
+import { BacklogToggle } from '../components/BacklogToggle';
+import { useShowBacklog, visibleStatuses } from '../utils/backlogVisibility';
 
 interface Props {
   tasks: Task[];
@@ -117,6 +119,7 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropStatus, setDropStatus] = useState<TaskStatus | null>(null);
   const [sortMode, setSortModeState] = useState<SortMode>(() => readSortMode());
+  const [showBacklog, setShowBacklog] = useShowBacklog();
 
   const setSortMode = (mode: SortMode) => {
     setSortModeState(mode);
@@ -303,11 +306,12 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
               ))}
             </select>
           </label>
+          <BacklogToggle show={showBacklog} onChange={setShowBacklog} count={columns.get('backlog')?.length ?? 0} />
           <span className="card-count">{tasks.length}</span>
         </header>
 
-        <div className="status-board">
-          {TASK_STATUSES.map((status) => {
+        <div className={`status-board${showBacklog ? '' : ' cols-4'}`}>
+          {visibleStatuses(showBacklog).map((status) => {
             const list = columns.get(status) ?? [];
             const shown = list.slice(0, COLUMN_LIMIT);
             const rest = list.length - shown.length;
