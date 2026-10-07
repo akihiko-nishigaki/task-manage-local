@@ -62,6 +62,9 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -SharedDataDir \\fileserver
 
 画面の「設定」→「現在のデータ」に「共有フォルダ運用中」と出ていれば有効です。
 
+管理者の準備・参加者への案内文・更新手順・トラブル対応までをまとめた配布手順書は、
+[docs/DEPLOY-FILESERVER.md](docs/DEPLOY-FILESERVER.md) にあります。
+
 ### 安全のための仕組み
 
 SQLite はネットワーク越しのファイルロックが完全には信頼できず、WAL モードも共有フォルダ上では動きません。
