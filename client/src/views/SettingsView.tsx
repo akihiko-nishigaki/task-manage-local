@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useStore } from '../store';
 import { ConfirmDialog } from '../components/Modal';
 import { IconDownload, IconLock, IconUpload } from '../components/Icons';
+import { WorkspacesPanel } from '../components/WorkspacesPanel';
 
 function timestamp(): string {
   const d = new Date();
@@ -81,6 +82,8 @@ export function SettingsView() {
           エクスポートもブラウザ内でファイルを生成してローカルに保存するだけです。
         </p>
       </section>
+
+      <WorkspacesPanel />
 
       <section className="panel">
         <h2>現在のデータ</h2>

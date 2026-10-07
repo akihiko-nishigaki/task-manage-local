@@ -13,7 +13,7 @@ import { tasksRouter } from './routes/tasks.js';
 import { transferRouter } from './routes/transfer.js';
 
 // ルートの package.json の version と必ず同じにする（health.test.ts が照合する）。リリース時に一緒に上げる。
-export const APP_VERSION = '0.3.1';
+export const APP_VERSION = '0.4.0';
 
 const BUILD_HINT = 'クライアントが未ビルドです。npm run build を実行してから再度アクセスしてください。\n';
 
@@ -27,7 +27,7 @@ export interface AppOptions {
 }
 
 /** 外部リソースを読み込ませないためのヘッダー。全レスポンスに付与する。 */
-function securityHeaders(_req: Request, res: Response, next: NextFunction): void {
+export function securityHeaders(_req: Request, res: Response, next: NextFunction): void {
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'",
@@ -42,7 +42,7 @@ interface BodyParserError extends Error {
   status?: number;
 }
 
-function errorHandler(error: unknown, _req: Request, res: Response, next: NextFunction): void {
+export function errorHandler(error: unknown, _req: Request, res: Response, next: NextFunction): void {
   if (res.headersSent) {
     next(error);
     return;
@@ -94,7 +94,12 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
     res.status(404).json({ error: { code: 'not_found', message: `${req.method} /api${req.path} は存在しません` } });
   });
 
-  const clientDist = options.clientDist;
+  mountClient(app, options.clientDist);
+  return app;
+}
+
+/** 画面ファイルの配信、未ビルド時の案内、404、エラー処理。API のあとに最後に付ける。 */
+export function mountClient(app: Express, clientDist: string | undefined): void {
   const hasClient = typeof clientDist === 'string' && existsSync(path.join(clientDist, 'index.html'));
   if (hasClient && clientDist) {
     app.use(express.static(clientDist, { index: 'index.html', maxAge: 0 }));
@@ -116,6 +121,4 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
     res.status(404).type('text/plain; charset=utf-8').send('見つかりません\n');
   });
   app.use(errorHandler);
-
-  return app;
 }

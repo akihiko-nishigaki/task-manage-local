@@ -205,3 +205,29 @@ export interface ImportInput { mode: 'replace' | 'merge'; data: ExportData }
 export interface ApiError {
   error: { code: string; message: string };
 }
+
+/** 切り替えて使える「データ」（共有 / 個人など）。1 つのサーバーが複数のデータを持てる。 */
+export interface WorkspaceInfo {
+  id: string;
+  name: string;
+  /** データ（tasks.db）の保存先 */
+  dataDir: string;
+  /** shared = 共有フォルダ上のデータを複数の PC から直接開く運用 */
+  mode: 'local' | 'shared';
+  /** 最初に開いたデータ。一覧から外せない */
+  primary: boolean;
+}
+
+export interface WorkspaceList {
+  workspaces: WorkspaceInfo[];
+  /** データの追加・名前変更・削除ができるか（LAN へ公開している共有サーバーでは false） */
+  canManage: boolean;
+}
+
+export interface CreateWorkspaceInput {
+  name: string;
+  /** 省略するとこの PC の中に自動で作る */
+  dataDir?: string;
+  /** マップしたドライブなど、パスから共有フォルダと分からないときに指定する */
+  shared?: boolean;
+}

@@ -1962,3 +1962,85 @@ textarea {
 input[aria-invalid='true'] {
   border-color: var(--danger);
 }
+
+/* ---------- データの切り替え（共有 / 個人など） ---------- */
+
+.workspace-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 2px 8px 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-weak);
+}
+
+.workspace-switch label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.workspace-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workspace-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.workspace-item.is-active {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+
+.workspace-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.workspace-name {
+  font-size: 14px;
+}
+
+.workspace-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.workspace-path {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.workspace-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.workspace-add h3 {
+  font-size: 13px;
+  margin: 4px 0 8px;
+}

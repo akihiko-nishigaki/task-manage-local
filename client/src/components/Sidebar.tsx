@@ -27,6 +27,9 @@ export function Sidebar({ route, onNewProject }: Props) {
     setCurrentUserId,
     includeArchived,
     setIncludeArchived,
+    workspaces,
+    activeWorkspaceId,
+    switchWorkspace,
   } = useStore();
 
   const openCounts = useMemo(() => {
@@ -76,6 +79,25 @@ export function Sidebar({ route, onNewProject }: Props) {
         </span>
         <span className="brand-text">タスク管理</span>
       </div>
+
+      {/* データが 2 つ以上あるときだけ出す。どのデータを開いているかを、いつでも見えるようにする */}
+      {workspaces.length > 1 ? (
+        <div className="workspace-switch">
+          <label htmlFor="workspace-select">使っているデータ</label>
+          <select
+            id="workspace-select"
+            value={activeWorkspaceId}
+            onChange={(e) => switchWorkspace(e.target.value)}
+          >
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+                {w.mode === 'shared' ? '（共有フォルダ）' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       <nav className="nav-group">
         {item({ name: 'dashboard' }, <IconHome />, 'ダッシュボード')}

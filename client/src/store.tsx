@@ -26,8 +26,9 @@ import type {
   UpdateProjectInput,
   UpdateTagInput,
   UpdateTaskInput,
+  WorkspaceInfo,
 } from '@shared/types';
-import { ApiError, api } from './api';
+import { ApiError, api, getActiveWorkspaceId, setActiveWorkspaceId } from './api';
 
 export interface Toast {
   id: number;
@@ -37,9 +38,15 @@ export interface Toast {
 
 const CURRENT_USER_KEY = 'taskmanage.currentUserId';
 
+/** 「現在のユーザー」はデータごとに別（メンバーの一覧がデータごとに違うため）。最初のデータは従来のキーのまま。 */
+function currentUserKey(): string {
+  const workspaceId = getActiveWorkspaceId();
+  return workspaceId ? `${CURRENT_USER_KEY}.${workspaceId}` : CURRENT_USER_KEY;
+}
+
 function readStoredUserId(): number | null {
   try {
-    const raw = localStorage.getItem(CURRENT_USER_KEY);
+    const raw = localStorage.getItem(currentUserKey());
     if (!raw) return null;
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : null;
@@ -59,6 +66,16 @@ interface StoreValue {
   currentUserId: number | null;
   setCurrentUserId: (id: number | null) => void;
   currentUser: Member | null;
+
+  /** 切り替えて使えるデータ（共有 / 個人など）。1 つだけのときは切り替えの表示を出さない */
+  workspaces: WorkspaceInfo[];
+  /** いま使っているデータの id */
+  activeWorkspaceId: string;
+  /** データの追加・名前変更・削除ができるか */
+  canManageWorkspaces: boolean;
+  /** 使うデータを切り替える（画面を読み込み直す） */
+  switchWorkspace: (id: string) => void;
+  refreshWorkspaces: () => Promise<void>;
 
   includeArchived: boolean;
   setIncludeArchived: (v: boolean) => void;
@@ -122,6 +139,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [currentUserId, setCurrentUserIdState] = useState<number | null>(() => readStoredUserId());
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastSeq = useRef(1);
+  const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
+  const [canManageWorkspaces, setCanManageWorkspaces] = useState(false);
+  const [storedWorkspaceId, setStoredWorkspaceId] = useState<string | null>(() => getActiveWorkspaceId());
 
   const dismissToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -147,8 +167,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setCurrentUserId = useCallback((id: number | null) => {
     setCurrentUserIdState(id);
     try {
-      if (id === null) localStorage.removeItem(CURRENT_USER_KEY);
-      else localStorage.setItem(CURRENT_USER_KEY, String(id));
+      if (id === null) localStorage.removeItem(currentUserKey());
+      else localStorage.setItem(currentUserKey(), String(id));
     } catch {
       /* localStorage が使えない環境では無視 */
     }
@@ -172,10 +192,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTasks(t);
   }, []);
 
+  const refreshWorkspaces = useCallback(async () => {
+    const list = await api.listWorkspaces();
+    setWorkspaces(list.workspaces);
+    setCanManageWorkspaces(list.canManage);
+  }, []);
+
+  const switchWorkspace = useCallback(
+    (id: string) => {
+      const primary = workspaces.find((w) => w.primary);
+      setActiveWorkspaceId(!primary || id === primary.id ? null : id);
+      // 開いていたプロジェクトなどは別のデータには無いので、ダッシュボードへ戻して読み込み直す
+      window.location.hash = '#/';
+      window.location.reload();
+    },
+    [workspaces],
+  );
+
+  const activeWorkspaceId = useMemo(() => {
+    const primaryId = workspaces.find((w) => w.primary)?.id ?? 'main';
+    return storedWorkspaceId && workspaces.some((w) => w.id === storedWorkspaceId) ? storedWorkspaceId : primaryId;
+  }, [workspaces, storedWorkspaceId]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        // どのデータを使うかは、画面のデータを読む前に確かめる（一覧から外されたデータを選んだままだと読めないため）
+        try {
+          const list = await api.listWorkspaces();
+          if (!cancelled) {
+            setWorkspaces(list.workspaces);
+            setCanManageWorkspaces(list.canManage);
+            const stored = getActiveWorkspaceId();
+            if (stored && !list.workspaces.some((w) => w.id === stored)) {
+              setActiveWorkspaceId(null);
+              setStoredWorkspaceId(null);
+              setCurrentUserIdState(readStoredUserId());
+            }
+          }
+        } catch {
+          /* 一覧を取れなくても、最初のデータで続ける */
+        }
         await refreshAll();
         if (!cancelled) setLoadError(null);
       } catch (err) {
@@ -562,6 +620,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     currentUserId,
     setCurrentUserId,
     currentUser,
+    workspaces,
+    activeWorkspaceId,
+    canManageWorkspaces,
+    switchWorkspace,
+    refreshWorkspaces,
     includeArchived,
     setIncludeArchived,
     toasts,

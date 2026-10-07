@@ -8,6 +8,7 @@ import type {
   CreateProjectInput,
   CreateTagInput,
   CreateTaskInput,
+  CreateWorkspaceInput,
   ExportData,
   Member,
   Project,
@@ -20,6 +21,8 @@ import type {
   UpdateProjectInput,
   UpdateTagInput,
   UpdateTaskInput,
+  WorkspaceInfo,
+  WorkspaceList,
 } from '@shared/types';
 
 export class ApiError extends Error {
@@ -34,6 +37,28 @@ export class ApiError extends Error {
 }
 
 const BASE = '/api';
+
+// 使うデータ（共有 / 個人など）の選択。ブラウザごとに覚え、全リクエストの X-Workspace ヘッダーで伝える。
+// 未設定（null）は、サーバーが最初に開いたデータ。
+const WORKSPACE_KEY = 'taskmanage.workspace';
+
+export function getActiveWorkspaceId(): string | null {
+  try {
+    const raw = localStorage.getItem(WORKSPACE_KEY);
+    return raw && raw !== '' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setActiveWorkspaceId(id: string | null): void {
+  try {
+    if (id === null) localStorage.removeItem(WORKSPACE_KEY);
+    else localStorage.setItem(WORKSPACE_KEY, id);
+  } catch {
+    /* localStorage が使えない環境では、最初のデータを使い続ける */
+  }
+}
 
 function buildQuery(params: Record<string, unknown> | undefined): string {
   if (!params) return '';
@@ -85,9 +110,10 @@ async function request<T>(
   options: { body?: unknown; query?: Record<string, unknown> } = {},
 ): Promise<T> {
   const url = `${BASE}${path}${buildQuery(options.query)}`;
+  const workspaceId = getActiveWorkspaceId();
   const init: RequestInit = {
     method,
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', ...(workspaceId ? { 'X-Workspace': workspaceId } : {}) },
     credentials: 'same-origin',
   };
   if (options.body !== undefined) {
@@ -128,6 +154,13 @@ async function request<T>(
 
 export const api = {
   health: () => request<{ ok: boolean; version: string; dataDir?: string; mode?: 'local' | 'shared' }>('GET', '/health'),
+
+  // --- データの切り替え（共有 / 個人など） ---
+  listWorkspaces: () => request<WorkspaceList>('GET', '/workspaces'),
+  createWorkspace: (input: CreateWorkspaceInput) => request<WorkspaceInfo>('POST', '/workspaces', { body: input }),
+  renameWorkspace: (id: string, name: string) =>
+    request<WorkspaceInfo>('PATCH', `/workspaces/${encodeURIComponent(id)}`, { body: { name } }),
+  deleteWorkspace: (id: string) => request<void>('DELETE', `/workspaces/${encodeURIComponent(id)}`),
 
   // --- メンバー ---
   listMembers: async (): Promise<Member[]> =>
