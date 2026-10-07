@@ -191,7 +191,7 @@ export function App() {
             <span className="color-dot" style={{ background: activeProject.color }} />
             <span className="project-stat">
               未完了 {scopedTasks.filter((t) => t.status !== 'done' && t.status !== 'backlog').length} / 全体{' '}
-              {tasks.filter((t) => t.projectId === activeProject.id).length}
+              {tasks.filter((t) => t.projectId === activeProject.id && t.status !== 'backlog').length}
             </span>
             {activeProject.archived ? <span className="badge archived-badge">アーカイブ済み</span> : null}
             <span className="spacer" />
