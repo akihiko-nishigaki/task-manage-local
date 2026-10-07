@@ -130,7 +130,8 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
     }
   };
 
-  const open = useMemo(() => tasks.filter((t) => t.status !== 'done'), [tasks]);
+  // 未完了 = 着手対象のタスク。プロダクトバックログはまだ着手前なので期限超過・今週・自分の担当に含めない
+  const open = useMemo(() => tasks.filter((t) => t.status !== 'done' && t.status !== 'backlog'), [tasks]);
 
   const overdue = useMemo(
     () =>

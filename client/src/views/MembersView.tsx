@@ -62,7 +62,7 @@ export function MembersView() {
             </thead>
             <tbody>
               {members.map((m) => {
-                const count = tasks.filter((t) => t.assigneeId === m.id && t.status !== 'done').length;
+                const count = tasks.filter((t) => t.assigneeId === m.id && t.status !== 'done' && t.status !== 'backlog').length;
                 return (
                   <tr key={m.id} className={m.active ? '' : 'row-muted'}>
                     <td>

@@ -21,7 +21,7 @@ const DEFAULT_COLOR = '#4f46e5';
 const LIST_SQL = `
   SELECT p.*,
          (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id) AS task_count,
-         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status <> 'done') AS open_task_count
+         (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status NOT IN ('done', 'backlog')) AS open_task_count
   FROM projects p
 `;
 

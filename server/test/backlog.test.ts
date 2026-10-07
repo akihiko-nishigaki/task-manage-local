@@ -25,6 +25,19 @@ test('backlog ステータスで作成でき、一覧は backlog → todo → do
   );
 });
 
+test('プロジェクトの openTaskCount にバックログと完了は含まれない', async (t) => {
+  const ctx = await createContext();
+  t.after(() => ctx.close());
+  const { projectId } = await seed(ctx);
+  await ctx.post('/api/tasks', { projectId, title: 'b', status: 'backlog' });
+  await ctx.post('/api/tasks', { projectId, title: 'd', status: 'done' });
+  await ctx.post('/api/tasks', { projectId, title: 't', status: 'todo' });
+  const list = await ctx.get('/api/projects');
+  const p = list.data.find((x: { id: number }) => x.id === projectId);
+  assert.equal(p.taskCount, 3);
+  assert.equal(p.openTaskCount, 1);
+});
+
 test('backlog から他のステータスへ、また戻す更新ができる', async (t) => {
   const ctx = await createContext();
   t.after(() => ctx.close());

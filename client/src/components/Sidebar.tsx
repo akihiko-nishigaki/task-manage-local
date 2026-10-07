@@ -32,15 +32,16 @@ export function Sidebar({ route, onNewProject }: Props) {
   const openCounts = useMemo(() => {
     const map = new Map<number, number>();
     for (const t of tasks) {
-      if (t.status === 'done') continue;
+      if (t.status === 'done' || t.status === 'backlog') continue;
       map.set(t.projectId, (map.get(t.projectId) ?? 0) + 1);
     }
     return map;
   }, [tasks]);
 
-  const openAll = tasks.filter((t) => t.status !== 'done').length;
+  // 未完了にはプロダクトバックログ（着手前）を含めない
+  const openAll = tasks.filter((t) => t.status !== 'done' && t.status !== 'backlog').length;
   const openMine = tasks.filter(
-    (t) => t.status !== 'done' && currentUserId !== null && t.assigneeId === currentUserId,
+    (t) => t.status !== 'done' && t.status !== 'backlog' && currentUserId !== null && t.assigneeId === currentUserId,
   ).length;
 
   const visibleProjects = projects.filter((p) => includeArchived || !p.archived);
