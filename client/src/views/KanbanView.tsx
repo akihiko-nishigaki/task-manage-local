@@ -169,7 +169,9 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
             <div className="kanban-cards">
               {items.map((t, index) => {
                 const project = projectById(t.projectId);
-                const overdue = t.status !== 'done' && isOverdue(t.dueDate);
+                // 完了とプロダクトバックログ（着手前）は期限の警告色を付けない
+                const warnDue = t.status !== 'done' && t.status !== 'backlog';
+                const overdue = warnDue && isOverdue(t.dueDate);
                 return (
                   <div key={t.id} className="card-slot">
                     {dropTarget && dropTarget.status === status && dropTarget.index === index ? (
@@ -210,7 +212,7 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
                         {t.dueDate ? (
                           <span
                             className={`due${overdue ? ' due-over' : ''}${
-                              t.status !== 'done' && isToday(t.dueDate) ? ' due-today' : ''
+                              warnDue && isToday(t.dueDate) ? ' due-today' : ''
                             }`}
                           >
                             {formatDueShort(t.dueDate)}

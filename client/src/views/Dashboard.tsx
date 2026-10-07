@@ -366,7 +366,9 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
                             {t.dueDate ? (
                               <span
                                 className={
-                                  isOverdue(t.dueDate) && t.status !== 'done' ? 'due due-over' : 'due'
+                                  isOverdue(t.dueDate) && t.status !== 'done' && t.status !== 'backlog'
+                                    ? 'due due-over'
+                                    : 'due'
                                 }
                               >
                                 {formatDueShort(t.dueDate)}
