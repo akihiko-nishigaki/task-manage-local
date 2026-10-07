@@ -12,7 +12,8 @@ import { tagsRouter } from './routes/tags.js';
 import { tasksRouter } from './routes/tasks.js';
 import { transferRouter } from './routes/transfer.js';
 
-export const APP_VERSION = '0.2.2';
+// ルートの package.json の version と必ず同じにする（health.test.ts が照合する）。リリース時に一緒に上げる。
+export const APP_VERSION = '0.3.0';
 
 const BUILD_HINT = 'クライアントが未ビルドです。npm run build を実行してから再度アクセスしてください。\n';
 
@@ -21,6 +22,8 @@ export interface AppOptions {
   clientDist?: string | undefined;
   /** データ保存先。/api/health で返し、設定画面に表示する。 */
   dataDir?: string | undefined;
+  /** 'shared' は共有フォルダ上の DB を複数 PC から開く運用 */
+  mode?: 'local' | 'shared' | undefined;
 }
 
 /** 外部リソースを読み込ませないためのヘッダー。全レスポンスに付与する。 */
@@ -71,7 +74,12 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
 
   const api = express.Router();
   api.get('/health', (_req, res) => {
-    res.json({ ok: true, version: APP_VERSION, ...(options.dataDir ? { dataDir: options.dataDir } : {}) });
+    res.json({
+      ok: true,
+      version: APP_VERSION,
+      ...(options.dataDir ? { dataDir: options.dataDir } : {}),
+      ...(options.mode ? { mode: options.mode } : {}),
+    });
   });
   api.use(membersRouter(db));
   api.use(projectsRouter(db));

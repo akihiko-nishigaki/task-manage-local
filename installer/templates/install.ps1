@@ -7,13 +7,18 @@
 #   -NoStartMenu スタートメニューにショートカットを作らない
 #   -Startup     パソコンの起動時に自動で立ち上げる（スタートアップにショートカットを置く）
 #   -NoLaunch    インストール後にアプリを起動しない
+#   -SharedDataDir  データの置き場所をファイルサーバーの共有フォルダにする（例: \\fileserver\share\task）。
+#                   参加する全員が同じフォルダを指定してインストールする。サーバーは各自の PC で動く。
+#   -UseLocalData   共有フォルダの指定をやめて、この PC だけで使う構成に戻す
 param(
   [string]$Dest = (Join-Path $env:LOCALAPPDATA 'Programs\TaskManage'),
   [string]$ShortcutDir = [Environment]::GetFolderPath('Desktop'),
   [switch]$NoShortcut,
   [switch]$NoStartMenu,
   [switch]$Startup,
-  [switch]$NoLaunch
+  [switch]$NoLaunch,
+  [string]$SharedDataDir = '',
+  [switch]$UseLocalData
 )
 # 日本語が文字化けしないよう、出力の文字コードをコンソールと揃える（install.bat 側で chcp 65001 済み）
 try { [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false } catch { }
@@ -49,7 +54,26 @@ $obsolete = @('setup.ps1', 'install.bat', 'install.ps1')
 Write-Host "$AppName をインストールします"
 Write-Host "  インストール元: $src    v$SrcVersion"
 Write-Host "  インストール先: $Dest    $(Get-AppVersion $Dest)"
-Write-Host "  データ        : $DataDir（アンインストールしても消えません）"
+
+# ファイルサーバー運用: server.json の dataDir に共有フォルダを書く。
+# 入れ替え（更新）のときは、-SharedDataDir を付けなくても前回の指定を引き継ぐ。
+$confPath = Join-Path $Dest 'server.json'
+$conf = [ordered]@{}
+if (Test-Path $confPath) {
+  try {
+    $existing = [IO.File]::ReadAllText($confPath) | ConvertFrom-Json
+    foreach ($p in $existing.PSObject.Properties) { $conf[$p.Name] = $p.Value }
+  } catch { $conf = [ordered]@{} }
+}
+if ($SharedDataDir -and $UseLocalData) { throw '-SharedDataDir と -UseLocalData は同時に指定できません' }
+if ($SharedDataDir) { $conf['dataDir'] = $SharedDataDir.Trim() }
+if ($UseLocalData -and $conf.Contains('dataDir')) { $conf.Remove('dataDir') }
+$SharedDir = if ($conf.Contains('dataDir') -and $conf['dataDir']) { [string]$conf['dataDir'] } else { '' }
+if ($SharedDir) {
+  Write-Host "  データ        : $SharedDir（ファイルサーバーの共有フォルダ。みんなで同じデータを使います）"
+} else {
+  Write-Host "  データ        : $DataDir（アンインストールしても消えません）"
+}
 
 if (-not (Test-Path $payload)) {
   throw "同じフォルダに program.zip がありません。配布 ZIP を「すべて展開」したフォルダの install.bat を実行してください"
@@ -65,6 +89,24 @@ if ([version]::TryParse(($nodeVer -replace '-.*$', ''), [ref]$parsed) -and $pars
   throw "Node.js のバージョンが古すぎます（現在 v$nodeVer）。22.13 以上が必要です。https://nodejs.org/ja から LTS 版を入れ直してください"
 }
 Write-Host "  Node.js : v$nodeVer"
+
+# 共有フォルダを使う場合は、入れ替えを始める前に「そこへ読み書きできるか」を確かめる
+if ($SharedDir) {
+  if (-not (Test-Path -LiteralPath $SharedDir)) {
+    try { New-Item -ItemType Directory -Force -Path $SharedDir | Out-Null } catch { }
+  }
+  if (-not (Test-Path -LiteralPath $SharedDir)) {
+    throw "共有フォルダ $SharedDir に接続できません。パスが正しいか、ネットワークに繋がっているかを確認してください"
+  }
+  $probe = Join-Path $SharedDir ('.write-test-' + [guid]::NewGuid().ToString('N'))
+  try {
+    [IO.File]::WriteAllText($probe, 'ok')
+    Remove-Item -LiteralPath $probe -Force
+  } catch {
+    throw "共有フォルダ $SharedDir に書き込めません。アクセス権（変更の許可）を確認してください"
+  }
+  Write-Host '  共有フォルダへの読み書き: OK'
+}
 
 # 起動中だとファイルを入れ替えても古い版が動き続けるので、先に止める
 if (Test-Path (Join-Path $Dest 'app.pid')) {
@@ -97,7 +139,13 @@ foreach ($f in $obsolete) {
   $p = Join-Path $Dest $f
   if (Test-Path $p) { Remove-Item -Force $p }
 }
-New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
+# server.json（共有フォルダの指定など）。入れ替えても消えないよう、program.zip には含めずここで書く
+if ($conf.Count -gt 0) {
+  [IO.File]::WriteAllText($confPath, ($conf | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
+} elseif (Test-Path $confPath) {
+  Remove-Item -LiteralPath $confPath -Force
+}
+if (-not $SharedDir) { New-Item -ItemType Directory -Force -Path $DataDir | Out-Null }
 
 # ショートカットは TaskManage.vbs を wscript.exe で開く（黒いウィンドウを出さずに起動するため）
 function New-AppShortcut([string]$dir) {
@@ -139,7 +187,11 @@ if (Test-Path $icon) { Set-ItemProperty -Path $RegPath -Name 'DisplayIcon' -Valu
 Write-Host ''
 Write-Host "インストールが完了しました。バージョン $destVer" -ForegroundColor Green
 Write-Host "  インストール先: $Dest"
-Write-Host "  データ保存先  : $DataDir"
+if ($SharedDir) {
+  Write-Host "  データ保存先  : $SharedDir（共有フォルダ。自動バックアップは同じ場所の backups フォルダ）"
+} else {
+  Write-Host "  データ保存先  : $DataDir"
+}
 Write-Host ''
 Write-Host 'デスクトップ / スタートメニューの「タスク管理」で起動できます（既に起動していれば画面が開くだけです）。'
 Write-Host "すぐに止めたいときは $(Join-Path $Dest 'stop.bat') を実行してください。"

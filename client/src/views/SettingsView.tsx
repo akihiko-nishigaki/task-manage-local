@@ -18,13 +18,16 @@ export function SettingsView() {
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dataDir, setDataDir] = useState<string | null>(null);
+  const [sharedMode, setSharedMode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     api
       .health()
       .then((h) => {
-        if (!cancelled) setDataDir(h.dataDir ?? null);
+        if (cancelled) return;
+        setDataDir(h.dataDir ?? null);
+        setSharedMode(h.mode === 'shared');
       })
       .catch(() => undefined);
     return () => {
@@ -99,7 +102,15 @@ export function SettingsView() {
           <p className="note data-dir">
             保存先: <code>{dataDir}</code>
             <br />
-            アプリのフォルダを入れ替えてもデータはこの場所に残ります。バックアップはサーバー停止後にこのフォルダをコピーしてください。
+            {sharedMode ? (
+              <>
+                共有フォルダ運用中です。みんなが同じデータを使っています。自動バックアップは
+                <code>backups</code>
+                フォルダに最大 30 世代（12 時間ごと）残ります。
+              </>
+            ) : (
+              'アプリのフォルダを入れ替えてもデータはこの場所に残ります。バックアップはサーバー停止後にこのフォルダをコピーしてください。'
+            )}
           </p>
         ) : null}
       </section>

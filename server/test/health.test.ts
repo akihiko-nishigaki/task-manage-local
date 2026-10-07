@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { APP_VERSION } from '../src/app.js';
 import { createContext } from './helpers.js';
 
 test('GET /api/health は ok と version を返す', async (t) => {
@@ -10,6 +12,16 @@ test('GET /api/health は ok と version を返す', async (t) => {
   assert.equal(res.status, 200);
   assert.equal(res.data.ok, true);
   assert.equal(typeof res.data.version, 'string');
+});
+
+test('health の version はルートの package.json と一致する（上げ忘れ防止）', async (t) => {
+  const ctx = await createContext();
+  t.after(() => ctx.close());
+
+  const root = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string };
+  const res = await ctx.get('/api/health');
+  assert.equal(res.data.version, root.version);
+  assert.equal(APP_VERSION, root.version);
 });
 
 test('セキュリティヘッダーが全レスポンスに付与される', async (t) => {

@@ -137,20 +137,42 @@ const MIGRATIONS: Migration[] = [
   },
 ];
 
+/** このアプリが扱えるスキーマの最新版。 */
+export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
+
+function appliedVersions(db: Db): Set<number> {
+  return new Set(
+    db.prepare('SELECT version FROM schema_migrations').all().map((row) => Number(row['version'])),
+  );
+}
+
 function migrate(db: Db): void {
   db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,
     applied_at TEXT NOT NULL
   );`);
-  const applied = new Set(
-    db.prepare('SELECT version FROM schema_migrations').all().map((row) => Number(row['version'])),
-  );
+  const applied = appliedVersions(db);
+  // 共有フォルダ運用では、更新済みの PC と未更新の PC が同じ DB を開くことがある。
+  // 新しい版で作り直された DB を古いアプリが触ると壊しかねないので、起動を止めて更新を促す。
+  const newest = Math.max(0, ...applied);
+  if (newest > LATEST_SCHEMA_VERSION) {
+    throw new Error(
+      `このデータは新しいバージョンのアプリで更新されています（データ v${newest} / このアプリは v${LATEST_SCHEMA_VERSION} まで対応）。` +
+        'アプリを最新版に更新してから起動してください。',
+    );
+  }
   for (const migration of MIGRATIONS) {
     if (applied.has(migration.version)) continue;
     // PRAGMA foreign_keys はトランザクション内では効かないので BEGIN の外で切り替える
     if (migration.withoutForeignKeys) db.exec('PRAGMA foreign_keys = OFF;');
-    db.exec('BEGIN');
+    // 複数の PC が同時に起動しても、移行を実行できるのは 1 台だけにする
+    db.exec('BEGIN IMMEDIATE');
     try {
+      if (appliedVersions(db).has(migration.version)) {
+        // 待っている間に別の PC が適用済み
+        db.exec('COMMIT');
+        continue;
+      }
       db.exec(migration.sql);
       if (migration.withoutForeignKeys) {
         const violations = db.prepare('PRAGMA foreign_key_check').all();
@@ -170,20 +192,42 @@ function migrate(db: Db): void {
   }
 }
 
+export interface CreateDbOptions {
+  /**
+   * 共有フォルダ / ファイルサーバー上の DB を複数の PC から直接開く運用。
+   * WAL はネットワーク越しでは動かないので通常のジャーナル（DELETE）を使い、
+   * ロック競合に備えて待ち時間を長く、書き込みは確実にディスクへ届くようにする。
+   */
+  shared?: boolean;
+}
+
 /** DB を開いてマイグレーションを適用する。テストでは ':memory:' を渡す。 */
-export function createDb(location: string): Db {
+export function createDb(location: string, options: CreateDbOptions = {}): Db {
   const db = new DatabaseSync(location);
-  if (location !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
+  const shared = options.shared === true && location !== ':memory:';
+  if (shared) {
+    // 先に待ち時間を決めてからジャーナル方式を切り替える（他の PC が使用中でも待てるように）
+    db.exec('PRAGMA busy_timeout = 15000;');
+    db.exec('PRAGMA journal_mode = DELETE;');
+    db.exec('PRAGMA synchronous = FULL;');
+  } else {
+    if (location !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
+    // 複数人で同時に使うと書き込みがぶつかる。すぐ諦めず 5 秒待ってから失敗させる
+    db.exec('PRAGMA busy_timeout = 5000;');
+  }
   db.exec('PRAGMA foreign_keys = ON;');
-  // 複数人で同時に使うと書き込みがぶつかる。すぐ諦めず 5 秒待ってから失敗させる
-  db.exec('PRAGMA busy_timeout = 5000;');
   migrate(db);
   return db;
 }
 
-/** 1 トランザクションで実行する。例外時は ROLLBACK。 */
+/**
+ * 1 トランザクションで実行する。例外時は ROLLBACK。
+ * 最初から書き込みロックを取る（IMMEDIATE）。読んでから書く通常の BEGIN だと、複数の接続
+ * （共有フォルダ運用では別の PC）が同時にロックを昇格しようとして、busy_timeout が効かずに
+ * 即 "database is locked" になるため。
+ */
 export function tx<T>(db: Db, fn: () => T): T {
-  db.exec('BEGIN');
+  db.exec('BEGIN IMMEDIATE');
   try {
     const result = fn();
     db.exec('COMMIT');

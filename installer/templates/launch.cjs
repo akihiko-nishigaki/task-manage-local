@@ -18,9 +18,12 @@ function readServerConfig() {
     const conf = JSON.parse(raw);
     const host = typeof conf.host === 'string' && conf.host ? conf.host : '127.0.0.1';
     const port = Number.isInteger(conf.port) ? conf.port : 3000;
-    return { host, port, shared: host !== '127.0.0.1' };
+    // dataDir: ファイルサーバー上の共有フォルダ（install.ps1 の -SharedDataDir が書く）。
+    // 指定があれば、みんなでその場所の DB を直接使う運用（サーバーは各自の PC で動かす）。
+    const dataDir = typeof conf.dataDir === 'string' && conf.dataDir.trim() ? conf.dataDir.trim() : '';
+    return { host, port, shared: host !== '127.0.0.1', dataDir };
   } catch {
-    return { host: '127.0.0.1', port: 3000, shared: false };
+    return { host: '127.0.0.1', port: 3000, shared: false, dataDir: '' };
   }
 }
 
@@ -36,6 +39,20 @@ const PORT_TRIES = CONF.shared ? 1 : 20;
 // データの保存先はサーバー側（dataDir.ts）が OS ごとに決める。
 // ここでは場所を重複して定義せず、停止用の PID ファイルだけをアプリのフォルダに置く。
 const PID_FILE = path.join(APP_DIR, 'app.pid');
+
+// 起動に失敗した理由。黒い画面を出さない起動なので、TaskManage.vbs がこのファイルを読んで表示する。
+// vbs が UTF-16 (BOM 付き) で読むので、同じ形式で書く。
+const ERROR_FILE = path.join(APP_DIR, 'last-error.txt');
+function writeLastError(message) {
+  try {
+    fs.writeFileSync(
+      ERROR_FILE,
+      Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(String(message).replace(/\r?\n/g, '\r\n'), 'utf16le')]),
+    );
+  } catch {
+    /* 書けなくても、そのまま終了するだけ */
+  }
+}
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -109,6 +126,23 @@ async function main() {
   process.env.HOST = BIND_HOST;
   process.env.PORT = String(port);
   process.env.WEB_DIR = path.join(APP_DIR, 'web');
+  if (CONF.dataDir) {
+    // 共有フォルダは、マップしたドライブ（Z: など）だとパスから判別できないので、ここで明示する
+    if (!process.env.DATA_DIR) process.env.DATA_DIR = CONF.dataDir;
+    if (!process.env.DB_MODE) process.env.DB_MODE = 'shared';
+    if (!fs.existsSync(CONF.dataDir)) {
+      const message = `共有フォルダ ${CONF.dataDir} に接続できません。\nネットワークに繋がっているか、アクセス権があるかを確認してください。`;
+      console.error(message);
+      writeLastError(message);
+      process.exit(1);
+    }
+  }
+  // サーバー側が [error] で出す致命的なメッセージ（データが新しい版で更新されている、整合性検査の失敗など）も表示できるようにする
+  const originalError = console.error.bind(console);
+  console.error = (...args) => {
+    originalError(...args);
+    if (args[0] === '[error]') writeLastError(args.slice(1).join(' '));
+  };
   require(path.join(APP_DIR, 'server.cjs'));
 
   try {

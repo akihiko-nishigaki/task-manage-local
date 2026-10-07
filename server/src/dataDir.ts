@@ -36,6 +36,17 @@ export function defaultDataDir({ platform, env, homedir }: PlatformInfo): string
   return path.join(base, APP_DIR_NAME, 'data');
 }
 
+/**
+ * 共有フォルダ運用（複数の PC が同じ DB を直接開く）かどうか。
+ * DB_MODE=shared の明示、または保存先がネットワーク共有（\\サーバー\共有 / //サーバー/共有）のとき。
+ * マップしたドライブ（Z: など）はパスだけでは見分けられないので、その場合は DB_MODE=shared を指定する。
+ */
+export function isSharedMode(env: Record<string, string | undefined>, dataDir: string): boolean {
+  if (env['DB_MODE'] === 'shared') return true;
+  if (env['DB_MODE'] === 'local') return false;
+  return /^[\\/]{2}[^\\/]/.test(dataDir);
+}
+
 export interface ResolveOptions extends PlatformInfo {
   /** 相対パスの DATA_DIR を解決する基準（通常は process.cwd()） */
   cwd: string;

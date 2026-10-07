@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
-import { DB_FILE, migrateLegacyData, resolveDataDir } from './dataDir.js';
+import { BACKUP_DIR_NAME, backupIfDue } from './backup.js';
+import { DB_FILE, isSharedMode, migrateLegacyData, resolveDataDir } from './dataDir.js';
 import { createDb } from './db.js';
 
 const SCHEME = 'http';
@@ -58,8 +59,47 @@ const webDir = process.env['WEB_DIR']
   ? path.resolve(process.cwd(), process.env['WEB_DIR'])
   : path.join(repoRoot, 'client', 'dist');
 
-const db = createDb(dbPath);
-const app = createApp(db, { clientDist: webDir, dataDir });
+// 共有フォルダ運用: DB_MODE=shared、または保存先がネットワーク共有（\サーバー\共有）のとき。
+// マップしたドライブ（Z: など）は見分けられないので、その場合は DB_MODE=shared を指定する。
+const sharedMode = isSharedMode(process.env, dataDir);
+if (sharedMode) console.error('[data] 共有フォルダ運用モード（通常のジャーナル方式・自動バックアップあり）');
+
+let db: ReturnType<typeof createDb>;
+try {
+  db = createDb(dbPath, { shared: sharedMode });
+  if (sharedMode) {
+    const check = db.prepare('PRAGMA quick_check').all();
+    const result = check.map((row) => String(Object.values(row)[0])).join(', ');
+    if (result !== 'ok') {
+      throw new Error(
+        `データの整合性検査に失敗しました（${result}）。${path.join(dataDir, BACKUP_DIR_NAME)} の最新のバックアップから戻してください。`,
+      );
+    }
+  }
+} catch (error) {
+  console.error('[error]', error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+const app = createApp(db, { clientDist: webDir, dataDir, mode: sharedMode ? 'shared' : 'local' });
+
+// 共有フォルダ運用では、起動時と 1 時間ごとに「必要なら」バックアップを作る（12 時間以内にあれば作らない）。
+if (sharedMode) {
+  const keep = Number(process.env['BACKUP_KEEP'] ?? 30);
+  const runBackup = (): void => {
+    try {
+      const made = backupIfDue(db, {
+        dir: path.join(dataDir, BACKUP_DIR_NAME),
+        keep: Number.isInteger(keep) && keep > 0 ? keep : 30,
+        minIntervalMs: 12 * 60 * 60 * 1000,
+      });
+      if (made) console.error(`[backup] ${made}`);
+    } catch (error) {
+      console.error('[backup] 失敗しました:', error instanceof Error ? error.message : String(error));
+    }
+  };
+  runBackup();
+  setInterval(runBackup, 60 * 60 * 1000).unref();
+}
 
 const server = app.listen(port, host, () => {
   const address = server.address();
