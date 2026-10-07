@@ -13,7 +13,7 @@ import { tasksRouter } from './routes/tasks.js';
 import { transferRouter } from './routes/transfer.js';
 
 // ルートの package.json の version と必ず同じにする（health.test.ts が照合する）。リリース時に一緒に上げる。
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.3.1';
 
 const BUILD_HINT = 'クライアントが未ビルドです。npm run build を実行してから再度アクセスしてください。\n';
 
