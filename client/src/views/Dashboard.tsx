@@ -308,7 +308,8 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
             </select>
           </label>
           <BacklogToggle show={showBacklog} onChange={setShowBacklog} count={columns.get('backlog')?.length ?? 0} />
-          <span className="card-count">{tasks.length}</span>
+          {/* 全体件数。プロジェクト画面の「全体」と同様にバックログは含めない（完了は含める） */}
+          <span className="card-count">{tasks.filter((t) => t.status !== 'backlog').length}</span>
         </header>
 
         <div className={`status-board${showBacklog ? '' : ' cols-4'}`}>
