@@ -112,7 +112,7 @@ export function Sidebar({ route, onNewProject }: Props) {
           value={currentUserId ?? ''}
           onChange={(e) => setCurrentUserId(e.target.value ? Number(e.target.value) : null)}
         >
-          <option value="">（未選択）</option>
+          <option value="">（全員）</option>
           {members.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}

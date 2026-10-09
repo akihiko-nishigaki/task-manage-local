@@ -3,7 +3,7 @@ import type { Task, TaskPriority, TaskStatus } from '@shared/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
 import { Assignee, ChannelBadge, PriorityBadge, StatusBadge, TaskLink } from '../components/Badges';
-import { IconAlert, IconBoard, IconCalendar, IconUser } from '../components/Icons';
+import { IconAlert, IconBoard, IconCalendar } from '../components/Icons';
 import { describeDue, formatDueShort, isOverdue, isWithinDays } from '../utils/date';
 import { BacklogToggle } from '../components/BacklogToggle';
 import { useShowBacklog, visibleStatuses } from '../utils/backlogVisibility';
@@ -114,7 +114,7 @@ function MiniList({
   );
 }
 
-export function Dashboard({ tasks, onOpenTask }: Props) {
+export function Dashboard({ tasks: allTasks, onOpenTask }: Props) {
   const { currentUser, memberById, projectById, projects, updateTask } = useStore();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropStatus, setDropStatus] = useState<TaskStatus | null>(null);
@@ -130,7 +130,13 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
     }
   };
 
-  // 未完了 = 着手対象のタスク。プロダクトバックログはまだ着手前なので期限超過・今週・自分の担当に含めない
+  // 現在のユーザーが選択されている間は、画面全体をそのユーザーの担当タスクに絞る
+  const tasks = useMemo(
+    () => (currentUser ? allTasks.filter((t) => t.assigneeId === currentUser.id) : allTasks),
+    [allTasks, currentUser],
+  );
+
+  // 未完了 = 着手対象のタスク。プロダクトバックログはまだ着手前なので期限超過・今週に含めない
   const open = useMemo(() => tasks.filter((t) => t.status !== 'done' && t.status !== 'backlog'), [tasks]);
 
   const overdue = useMemo(
@@ -147,11 +153,6 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
         .filter((t) => isWithinDays(t.dueDate, 7))
         .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? '')),
     [open],
-  );
-
-  const mine = useMemo(
-    () => (currentUser ? open.filter((t) => t.assigneeId === currentUser.id) : []),
-    [open, currentUser],
   );
 
   // プロジェクトの並び順（サイドバーの表示順に合わせる）。
@@ -226,6 +227,11 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
 
   return (
     <div className="dashboard">
+      {currentUser ? (
+        <p className="muted head-hint">
+          {currentUser.name} さんの担当タスクのみ表示中（左サイドバーの「現在のユーザー」で切り替え）
+        </p>
+      ) : null}
       <div className="dash-summary">
         <section className="card">
           <header className="card-head">
@@ -257,28 +263,6 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
             tasks={upcoming.slice(0, 12)}
             onOpenTask={onOpenTask}
             empty="直近 7 日に期限のタスクはありません。"
-            onDragStartTask={startDrag}
-            onDragEnd={endDrag}
-            draggingId={dragId}
-          />
-        </section>
-
-        <section className="card">
-          <header className="card-head">
-            <span className="card-icon">
-              <IconUser />
-            </span>
-            <h2>担当タスク{currentUser ? `（${currentUser.name}）` : ''}</h2>
-            <span className="card-count">{mine.length}</span>
-          </header>
-          <MiniList
-            tasks={mine.slice(0, 12)}
-            onOpenTask={onOpenTask}
-            empty={
-              currentUser
-                ? '担当しているタスクはありません。'
-                : '左サイドバーで「現在のユーザー」を選択してください。'
-            }
             onDragStartTask={startDrag}
             onDragEnd={endDrag}
             draggingId={dragId}

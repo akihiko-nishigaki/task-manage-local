@@ -123,7 +123,7 @@ export function App() {
     route.name === 'project'
       ? activeProject?.description || undefined
       : route.name === 'mine' && !store.currentUser
-        ? '現在のユーザーが未選択です'
+        ? '左サイドバーで「現在のユーザー」を選択してください'
         : undefined;
 
   const defaultProjectId =
