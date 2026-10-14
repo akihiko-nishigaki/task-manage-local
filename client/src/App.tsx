@@ -10,6 +10,7 @@ import { TaskCreateModal } from './components/TaskCreateModal';
 import { ProjectModal } from './components/ProjectModal';
 import { ConfirmDialog } from './components/Modal';
 import { Dashboard } from './views/Dashboard';
+import { applyTaskFilter, EMPTY_FILTER, TaskFilterBar, type TaskFilter } from './components/TaskFilterBar';
 import { ListView } from './views/ListView';
 import { KanbanView } from './views/KanbanView';
 import { MembersView } from './views/MembersView';
@@ -35,6 +36,8 @@ export function App() {
 
   const [view, setViewState] = useState<ViewMode>(() => readViewMode());
   const [search, setSearch] = useState('');
+  // 絞り込みはリストとカンバンで共有する（表示を切り替えても条件が消えないように）
+  const [filter, setFilter] = useState<TaskFilter>(EMPTY_FILTER);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [projectModal, setProjectModal] = useState<{ project: Project | null } | null>(null);
@@ -129,6 +132,12 @@ export function App() {
   const defaultProjectId =
     route.name === 'project' ? route.projectId : projects.find((p) => !p.archived)?.id ?? null;
 
+  // カンバンは列がステータスなので、ステータスと「完了を表示」は適用しない
+  const filteredTasks = useMemo(
+    () => applyTaskFilter(scopedTasks, filter, view === 'list'),
+    [scopedTasks, filter, view],
+  );
+
   const renderMain = () => {
     if (!ready) return <p className="empty-state">読み込み中…</p>;
     if (loadError)
@@ -153,15 +162,25 @@ export function App() {
       case 'settings':
         return <SettingsView />;
       default:
-        return view === 'kanban' ? (
-          <KanbanView
-            tasks={scopedTasks}
-            onOpenTask={setSelectedTaskId}
-            quickAddProjectId={defaultProjectId}
-            onArchiveDone={openArchiveConfirm}
-          />
-        ) : (
-          <ListView tasks={scopedTasks} onOpenTask={setSelectedTaskId} />
+        return (
+          <>
+            <TaskFilterBar
+              value={filter}
+              onChange={setFilter}
+              showStatus={view === 'list'}
+              count={filteredTasks.length}
+            />
+            {view === 'kanban' ? (
+              <KanbanView
+                tasks={filteredTasks}
+                onOpenTask={setSelectedTaskId}
+                quickAddProjectId={defaultProjectId}
+                onArchiveDone={openArchiveConfirm}
+              />
+            ) : (
+              <ListView tasks={filteredTasks} onOpenTask={setSelectedTaskId} />
+            )}
+          </>
         );
     }
   };
