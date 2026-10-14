@@ -32,17 +32,23 @@ export function Sidebar({ route, onNewProject }: Props) {
     switchWorkspace,
   } = useStore();
 
+  // 「現在のユーザー」を選んでいる間は、各画面の表示と件数が食い違わないよう担当分だけ数える
+  const inScope = (assigneeId: number | null) => currentUserId === null || assigneeId === currentUserId;
+
   const openCounts = useMemo(() => {
     const map = new Map<number, number>();
     for (const t of tasks) {
       if (t.status === 'done' || t.status === 'backlog') continue;
+      if (currentUserId !== null && t.assigneeId !== currentUserId) continue;
       map.set(t.projectId, (map.get(t.projectId) ?? 0) + 1);
     }
     return map;
-  }, [tasks]);
+  }, [tasks, currentUserId]);
 
   // 未完了にはプロダクトバックログ（着手前）を含めない
-  const openAll = tasks.filter((t) => t.status !== 'done' && t.status !== 'backlog').length;
+  const openAll = tasks.filter(
+    (t) => t.status !== 'done' && t.status !== 'backlog' && inScope(t.assigneeId),
+  ).length;
   const openMine = tasks.filter(
     (t) => t.status !== 'done' && t.status !== 'backlog' && currentUserId !== null && t.assigneeId === currentUserId,
   ).length;

@@ -114,7 +114,7 @@ function MiniList({
   );
 }
 
-export function Dashboard({ tasks: allTasks, onOpenTask }: Props) {
+export function Dashboard({ tasks, onOpenTask }: Props) {
   const { currentUser, memberById, projectById, projects, updateTask } = useStore();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropStatus, setDropStatus] = useState<TaskStatus | null>(null);
@@ -130,12 +130,7 @@ export function Dashboard({ tasks: allTasks, onOpenTask }: Props) {
     }
   };
 
-  // 現在のユーザーが選択されている間は、画面全体をそのユーザーの担当タスクに絞る
-  const tasks = useMemo(
-    () => (currentUser ? allTasks.filter((t) => t.assigneeId === currentUser.id) : allTasks),
-    [allTasks, currentUser],
-  );
-
+  // 「現在のユーザー」での絞り込みは App 側（scopedTasks）で済ませてから渡される。
   // 未完了 = 着手対象のタスク。プロダクトバックログはまだ着手前なので期限超過・今週に含めない
   const open = useMemo(() => tasks.filter((t) => t.status !== 'done' && t.status !== 'backlog'), [tasks]);
 

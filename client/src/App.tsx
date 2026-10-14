@@ -80,6 +80,12 @@ export function App() {
       );
     else list = list.filter((t) => visibleProjectIds.has(t.projectId));
 
+    // 「現在のユーザー」を選んでいる間は、どの画面でもそのユーザーの担当タスクだけを見せる。
+    // マイタスクは上の分岐で絞り済み。未選択（全員）のときは絞らない。
+    if (currentUserId !== null && route.name !== 'mine') {
+      list = list.filter((t) => t.assigneeId === currentUserId);
+    }
+
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -164,6 +170,12 @@ export function App() {
       default:
         return (
           <>
+            {/* 絞り込みが効いていることが画面から分かるようにする（ダッシュボードと同じ案内） */}
+            {store.currentUser && route.name !== 'mine' ? (
+              <p className="muted head-hint">
+                {store.currentUser.name} さんの担当タスクのみ表示中（左サイドバーの「現在のユーザー」で切り替え）
+              </p>
+            ) : null}
             <TaskFilterBar
               value={filter}
               onChange={setFilter}
@@ -210,7 +222,15 @@ export function App() {
             <span className="color-dot" style={{ background: activeProject.color }} />
             <span className="project-stat">
               未完了 {scopedTasks.filter((t) => t.status !== 'done' && t.status !== 'backlog').length} / 全体{' '}
-              {tasks.filter((t) => t.projectId === activeProject.id && t.status !== 'backlog').length}
+              {
+                tasks.filter(
+                  (t) =>
+                    t.projectId === activeProject.id &&
+                    t.status !== 'backlog' &&
+                    // 「現在のユーザー」で絞っているときは、表示中の件数と揃える
+                    (currentUserId === null || t.assigneeId === currentUserId),
+                ).length
+              }
             </span>
             {activeProject.archived ? <span className="badge archived-badge">アーカイブ済み</span> : null}
             <span className="spacer" />
