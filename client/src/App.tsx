@@ -9,6 +9,7 @@ import { TaskDrawer } from './components/TaskDrawer';
 import { TaskCreateModal } from './components/TaskCreateModal';
 import { ProjectModal } from './components/ProjectModal';
 import { ConfirmDialog } from './components/Modal';
+import { UserScopeHint } from './components/UserScopeHint';
 import { Dashboard } from './views/Dashboard';
 import { applyTaskFilter, EMPTY_FILTER, TaskFilterBar, type TaskFilter } from './components/TaskFilterBar';
 import { ListView } from './views/ListView';
@@ -31,7 +32,7 @@ function readViewMode(): ViewMode {
 
 export function App() {
   const store = useStore();
-  const { ready, loadError, projects, tasks, currentUserId, includeArchived } = store;
+  const { ready, loadError, projects, tasks, currentUserId, inUserScope, includeArchived } = store;
   const route = useRoute();
 
   const [view, setViewState] = useState<ViewMode>(() => readViewMode());
@@ -80,10 +81,11 @@ export function App() {
       );
     else list = list.filter((t) => visibleProjectIds.has(t.projectId));
 
-    // 「現在のユーザー」を選んでいる間は、どの画面でもそのユーザーの担当タスクだけを見せる。
+    // 「現在のユーザー」を選んでいる間は、どの画面でもそのユーザーの担当タスク
+    // （「未割当」なら誰にも割り当てられていないタスク）だけを見せる。
     // マイタスクは上の分岐で絞り済み。未選択（全員）のときは絞らない。
-    if (currentUserId !== null && route.name !== 'mine') {
-      list = list.filter((t) => t.assigneeId === currentUserId);
+    if (route.name !== 'mine') {
+      list = list.filter((t) => inUserScope(t.assigneeId));
     }
 
     const q = search.trim().toLowerCase();
@@ -94,7 +96,7 @@ export function App() {
       );
     }
     return list;
-  }, [tasks, projects, route, currentUserId, includeArchived, search]);
+  }, [tasks, projects, route, currentUserId, inUserScope, includeArchived, search]);
 
   const isTaskRoute = route.name === 'dashboard' || route.name === 'all' || route.name === 'mine' || route.name === 'project';
 
@@ -171,11 +173,7 @@ export function App() {
         return (
           <>
             {/* 絞り込みが効いていることが画面から分かるようにする（ダッシュボードと同じ案内） */}
-            {store.currentUser && route.name !== 'mine' ? (
-              <p className="muted head-hint">
-                {store.currentUser.name} さんの担当タスクのみ表示中（左サイドバーの「現在のユーザー」で切り替え）
-              </p>
-            ) : null}
+            {route.name !== 'mine' ? <UserScopeHint /> : null}
             <TaskFilterBar
               value={filter}
               onChange={setFilter}
@@ -228,7 +226,7 @@ export function App() {
                     t.projectId === activeProject.id &&
                     t.status !== 'backlog' &&
                     // 「現在のユーザー」で絞っているときは、表示中の件数と揃える
-                    (currentUserId === null || t.assigneeId === currentUserId),
+                    inUserScope(t.assigneeId),
                 ).length
               }
             </span>

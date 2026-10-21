@@ -25,6 +25,9 @@ export function Sidebar({ route, onNewProject }: Props) {
     members,
     currentUserId,
     setCurrentUserId,
+    unassignedOnly,
+    selectUnassigned,
+    inUserScope,
     includeArchived,
     setIncludeArchived,
     workspaces,
@@ -32,22 +35,20 @@ export function Sidebar({ route, onNewProject }: Props) {
     switchWorkspace,
   } = useStore();
 
-  // 「現在のユーザー」を選んでいる間は、各画面の表示と件数が食い違わないよう担当分だけ数える
-  const inScope = (assigneeId: number | null) => currentUserId === null || assigneeId === currentUserId;
-
+  // 「現在のユーザー」を選んでいる間は、各画面の表示と件数が食い違わないよう担当分（未割当なら未割当分）だけ数える
   const openCounts = useMemo(() => {
     const map = new Map<number, number>();
     for (const t of tasks) {
       if (t.status === 'done' || t.status === 'backlog') continue;
-      if (currentUserId !== null && t.assigneeId !== currentUserId) continue;
+      if (!inUserScope(t.assigneeId)) continue;
       map.set(t.projectId, (map.get(t.projectId) ?? 0) + 1);
     }
     return map;
-  }, [tasks, currentUserId]);
+  }, [tasks, inUserScope]);
 
   // 未完了にはプロダクトバックログ（着手前）を含めない
   const openAll = tasks.filter(
-    (t) => t.status !== 'done' && t.status !== 'backlog' && inScope(t.assigneeId),
+    (t) => t.status !== 'done' && t.status !== 'backlog' && inUserScope(t.assigneeId),
   ).length;
   const openMine = tasks.filter(
     (t) => t.status !== 'done' && t.status !== 'backlog' && currentUserId !== null && t.assigneeId === currentUserId,
@@ -115,10 +116,15 @@ export function Sidebar({ route, onNewProject }: Props) {
         <label htmlFor="current-user-select">現在のユーザー</label>
         <select
           id="current-user-select"
-          value={currentUserId ?? ''}
-          onChange={(e) => setCurrentUserId(e.target.value ? Number(e.target.value) : null)}
+          value={unassignedOnly ? 'none' : currentUserId ?? ''}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === 'none') selectUnassigned();
+            else setCurrentUserId(v ? Number(v) : null);
+          }}
         >
           <option value="">（全員）</option>
+          <option value="none">（未割当）</option>
           {members.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
