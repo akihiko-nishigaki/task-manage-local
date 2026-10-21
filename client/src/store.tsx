@@ -55,6 +55,17 @@ function readStoredUserId(): number | null {
   }
 }
 
+/** 「現在のユーザー」で「未割当」を選んでいるときに保存する値。 */
+const UNASSIGNED_VALUE = 'none';
+
+function readStoredUnassigned(): boolean {
+  try {
+    return localStorage.getItem(currentUserKey()) === UNASSIGNED_VALUE;
+  } catch {
+    return false;
+  }
+}
+
 interface StoreValue {
   ready: boolean;
   loadError: string | null;
@@ -66,6 +77,12 @@ interface StoreValue {
   currentUserId: number | null;
   setCurrentUserId: (id: number | null) => void;
   currentUser: Member | null;
+  /** 「現在のユーザー」で「未割当」を選んでいるか（このとき currentUserId は null） */
+  unassignedOnly: boolean;
+  /** 「未割当」を選ぶ。メンバーや（全員）に戻すときは setCurrentUserId を使う */
+  selectUnassigned: () => void;
+  /** 「現在のユーザー」の選択に合うタスクか（担当者 ID で判定。（全員）なら常に true） */
+  inUserScope: (assigneeId: number | null) => boolean;
 
   /** 切り替えて使えるデータ（共有 / 個人など）。1 つだけのときは切り替えの表示を出さない */
   workspaces: WorkspaceInfo[];
@@ -137,6 +154,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [includeArchived, setIncludeArchived] = useState(false);
   const [currentUserId, setCurrentUserIdState] = useState<number | null>(() => readStoredUserId());
+  const [unassignedOnly, setUnassignedOnly] = useState(() => readStoredUnassigned());
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastSeq = useRef(1);
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
@@ -166,6 +184,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setCurrentUserId = useCallback((id: number | null) => {
     setCurrentUserIdState(id);
+    setUnassignedOnly(false);
     try {
       if (id === null) localStorage.removeItem(currentUserKey());
       else localStorage.setItem(currentUserKey(), String(id));
@@ -173,6 +192,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       /* localStorage が使えない環境では無視 */
     }
   }, []);
+
+  const selectUnassigned = useCallback(() => {
+    setCurrentUserIdState(null);
+    setUnassignedOnly(true);
+    try {
+      localStorage.setItem(currentUserKey(), UNASSIGNED_VALUE);
+    } catch {
+      /* localStorage が使えない環境では無視 */
+    }
+  }, []);
+
+  const inUserScope = useCallback(
+    (assigneeId: number | null) =>
+      unassignedOnly ? assigneeId === null : currentUserId === null || assigneeId === currentUserId,
+    [unassignedOnly, currentUserId],
+  );
 
   const refreshTasks = useCallback(async () => {
     const list = await api.listTasks({ includeDone: true });
@@ -229,6 +264,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               setActiveWorkspaceId(null);
               setStoredWorkspaceId(null);
               setCurrentUserIdState(readStoredUserId());
+              setUnassignedOnly(readStoredUnassigned());
             }
           }
         } catch {
@@ -620,6 +656,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     currentUserId,
     setCurrentUserId,
     currentUser,
+    unassignedOnly,
+    selectUnassigned,
+    inUserScope,
     workspaces,
     activeWorkspaceId,
     canManageWorkspaces,

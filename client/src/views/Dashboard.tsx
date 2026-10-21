@@ -6,6 +6,7 @@ import { Assignee, ChannelBadge, PriorityBadge, StatusBadge, TaskLink } from '..
 import { IconAlert, IconBoard, IconCalendar } from '../components/Icons';
 import { describeDue, formatDueShort, isOverdue, isWithinDays } from '../utils/date';
 import { BacklogToggle } from '../components/BacklogToggle';
+import { UserScopeHint } from '../components/UserScopeHint';
 import { useShowBacklog, visibleStatuses } from '../utils/backlogVisibility';
 
 interface Props {
@@ -115,7 +116,7 @@ function MiniList({
 }
 
 export function Dashboard({ tasks, onOpenTask }: Props) {
-  const { currentUser, memberById, projectById, projects, updateTask } = useStore();
+  const { memberById, projectById, projects, updateTask } = useStore();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropStatus, setDropStatus] = useState<TaskStatus | null>(null);
   const [sortMode, setSortModeState] = useState<SortMode>(() => readSortMode());
@@ -222,11 +223,7 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
 
   return (
     <div className="dashboard">
-      {currentUser ? (
-        <p className="muted head-hint">
-          {currentUser.name} さんの担当タスクのみ表示中（左サイドバーの「現在のユーザー」で切り替え）
-        </p>
-      ) : null}
+      <UserScopeHint />
       <div className="dash-summary">
         <section className="card">
           <header className="card-head">
