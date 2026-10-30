@@ -72,8 +72,9 @@ test('既存 DB（v3）を開くと backlog が使えるようになり、タス
   first.close();
 
   const raw = new DatabaseSync(file);
-  raw.exec('DELETE FROM schema_migrations WHERE version = 4');
-  // v3 時点の制約（backlog を含まない）に戻す
+  // v4 以降（backlog・レビュー）の適用記録を消して、v3 までの DB に見立てる
+  raw.exec('DELETE FROM schema_migrations WHERE version >= 4');
+  // v3 時点の制約（backlog を含まない）・列構成（レビューの列が無い）に戻す
   raw.exec('PRAGMA foreign_keys = OFF;');
   raw.exec(`
     CREATE TABLE tasks_old AS SELECT * FROM tasks;
@@ -95,7 +96,11 @@ test('既存 DB（v3）を開くと backlog が使えるようになり、タス
       channel TEXT,
       link TEXT
     );
-    INSERT INTO tasks SELECT * FROM tasks_old;
+    INSERT INTO tasks (id, project_id, title, description, status, priority, assignee_id, due_date,
+                       position, created_at, updated_at, completed_at, archived_at, channel, link)
+      SELECT id, project_id, title, description, status, priority, assignee_id, due_date,
+             position, created_at, updated_at, completed_at, archived_at, channel, link
+      FROM tasks_old;
     DROP TABLE tasks_old;
   `);
   assert.throws(() => raw.exec(`UPDATE tasks SET status = 'backlog'`));
@@ -108,4 +113,9 @@ test('既存 DB（v3）を開くと backlog が使えるようになり、タス
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_tags').get()?.['n'], 1);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM comments').get()?.['n'], 1);
   assert.equal(db.prepare('PRAGMA foreign_keys').get()?.['foreign_keys'], 1);
+  // v5（レビュー）も続けて適用され、既存タスクはレビュー期限なし・レビュー前になる
+  const row = db.prepare('SELECT review_due, reviewed, reviewed_at FROM tasks WHERE id = 1').get();
+  assert.equal(row?.['review_due'], null);
+  assert.equal(Number(row?.['reviewed']), 0);
+  assert.equal(row?.['reviewed_at'], null);
 });

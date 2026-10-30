@@ -14,7 +14,7 @@ import {
   tagIdsByTask,
   tagIdsForTask,
 } from '../repo.js';
-import { nowIso, toComment, toTask } from '../rows.js';
+import { nowIso, sqlBool, toComment, toTask } from '../rows.js';
 import type { Row } from '../rows.js';
 import {
   asObject,
@@ -23,6 +23,7 @@ import {
   queryBoolean,
   queryId,
   queryString,
+  requireBoolean,
   requireDate,
   requireId,
   requireIdArray,
@@ -267,6 +268,8 @@ export function tasksRouter(db: Db): Router {
     ensureTags(db, tagIds);
     const channel = has(body, 'channel') ? requireNullableChannel(body['channel']) : null;
     const link = has(body, 'link') ? requireNullableLink(body['link']) : null;
+    const reviewDue = has(body, 'reviewDue') ? requireNullableDate(body['reviewDue'], 'reviewDue') : null;
+    const reviewed = has(body, 'reviewed') ? requireBoolean(body['reviewed'], 'reviewed') : false;
 
     const now = nowIso();
     const id = tx(db, () => {
@@ -274,8 +277,8 @@ export function tasksRouter(db: Db): Router {
         .prepare(
           `INSERT INTO tasks
              (project_id, title, description, status, priority, assignee_id, due_date, position,
-              created_at, updated_at, completed_at, channel, link)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              created_at, updated_at, completed_at, channel, link, review_due, reviewed, reviewed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           projectId,
@@ -291,6 +294,9 @@ export function tasksRouter(db: Db): Router {
           status === 'done' ? now : null,
           channel,
           link,
+          reviewDue,
+          sqlBool(reviewed),
+          reviewed ? now : null,
         );
       const newId = Number(info.lastInsertRowid);
       if (tagIds.length > 0) setTaskTags(db, newId, tagIds);
@@ -341,9 +347,16 @@ export function tasksRouter(db: Db): Router {
     if (has(body, 'channel')) push('channel = ?', requireNullableChannel(body['channel']));
     if (has(body, 'link')) push('link = ?', requireNullableLink(body['link']));
     if (has(body, 'priority')) push('priority = ?', requirePriority(body['priority']));
+    if (has(body, 'reviewDue')) push('review_due = ?', requireNullableDate(body['reviewDue'], 'reviewDue'));
 
     const status = has(body, 'status') ? requireStatus(body['status']) : current.status;
     const now = nowIso();
+    // レビューのチェック。付けたときだけ日時を記録し、すでに付いていれば最初の日時を残す
+    if (has(body, 'reviewed')) {
+      const reviewed = requireBoolean(body['reviewed'], 'reviewed');
+      push('reviewed = ?', sqlBool(reviewed));
+      push('reviewed_at = ?', reviewed ? (current.reviewed ? current.reviewedAt : now) : null);
+    }
     if (status !== current.status) {
       push('status = ?', status);
       push('completed_at = ?', completedAtFor(current.status, status, current.completedAt, now));

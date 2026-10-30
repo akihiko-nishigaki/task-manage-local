@@ -2,9 +2,18 @@ import { useMemo, useState } from 'react';
 import type { Task, TaskPriority, TaskStatus } from '@shared/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
-import { Assignee, ChannelBadge, DueDate, PriorityBadge, TagList, TaskLink } from '../components/Badges';
+import {
+  Assignee,
+  ChannelBadge,
+  DueDate,
+  PriorityBadge,
+  ReviewCheck,
+  TagList,
+  TaskLink,
+} from '../components/Badges';
+import { useToggleReviewed } from '../utils/review';
 
-type SortKey = 'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'position';
+type SortKey = 'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'reviewDue' | 'position';
 
 const PRIORITY_ORDER: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
 const STATUS_ORDER: Record<TaskStatus, number> = {
@@ -22,6 +31,7 @@ interface Props {
 
 export function ListView({ tasks, onOpenTask }: Props) {
   const { memberById, tagById, updateTask } = useStore();
+  const toggleReviewed = useToggleReviewed();
   const [sortKey, setSortKey] = useState<SortKey>('position');
   const [asc, setAsc] = useState(true);
   // 絞り込みは App 側（TaskFilterBar）で済ませてから渡される
@@ -44,6 +54,11 @@ export function ListView({ tasks, onOpenTask }: Props) {
         case 'dueDate': {
           const ad = a.dueDate ?? '9999-99-99';
           const bd = b.dueDate ?? '9999-99-99';
+          return ad.localeCompare(bd) * dir;
+        }
+        case 'reviewDue': {
+          const ad = a.reviewDue ?? '9999-99-99';
+          const bd = b.reviewDue ?? '9999-99-99';
           return ad.localeCompare(bd) * dir;
         }
         default:
@@ -84,6 +99,8 @@ export function ListView({ tasks, onOpenTask }: Props) {
                 {header('priority', '優先度')}
                 {header('assignee', '担当')}
                 {header('dueDate', '期限')}
+                {header('reviewDue', 'レビュー期限')}
+                <th title="レビューが終わったらチェック（行の右クリックでも切り替えられます）">レビュー</th>
                 <th>チャネル</th>
                 <th>タグ</th>
               </tr>
@@ -94,6 +111,7 @@ export function ListView({ tasks, onOpenTask }: Props) {
                   key={t.id}
                   className={t.status === 'done' ? 'row-done' : ''}
                   onClick={() => onOpenTask(t.id)}
+                  onContextMenu={(e) => toggleReviewed(t, e)}
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') onOpenTask(t.id);
@@ -124,6 +142,12 @@ export function ListView({ tasks, onOpenTask }: Props) {
                   </td>
                   <td>
                     <DueDate due={t.dueDate} done={t.status === 'done' || t.status === 'backlog'} />
+                  </td>
+                  <td>
+                    <DueDate due={t.reviewDue} done={t.reviewed} />
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <ReviewCheck task={t} onToggle={toggleReviewed} />
                   </td>
                   <td>
                     <span className="cell-channel">

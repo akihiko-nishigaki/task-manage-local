@@ -104,6 +104,46 @@ export interface Task {
   archivedAt: string | null; // アーカイブ済みなら ISO 8601、未アーカイブなら null
   channel: TaskChannel | null; // やり取りしているチャネル
   link: string | null; // 関連するメール / Teams などへのリンク
+  reviewDue: string | null; // レビュー期限 'YYYY-MM-DD'。期限（dueDate）と同じ扱いで期限超過を見る
+  reviewed: boolean; // レビュー実施のチェック（下の ReviewState を参照）
+  reviewedAt: string | null; // チェックを付けた日時（ISO 8601）
+}
+
+/**
+ * レビューの段階。
+ * ステータス（未着手 / 進行中 / レビュー / 完了）の選択肢は増やさず、
+ * 「レビュー」ステータスの中でレビュー前か後かが分かるように、チェック 1 個と状態の組み合わせで表す。
+ */
+export type ReviewState = 'before' | 'fix' | 'done';
+
+export const REVIEW_STATE_LABELS: Record<ReviewState, string> = {
+  before: 'レビュー前',
+  fix: 'レビュー修正',
+  done: 'レビュー済',
+};
+
+/** チェック OFF = レビュー前 / ON かつ未完了 = レビュー修正（指摘の直し待ち）/ ON かつ完了 = レビュー済 */
+export function reviewStateOf(task: Pick<Task, 'reviewed' | 'status'>): ReviewState {
+  if (!task.reviewed) return 'before';
+  return task.status === 'done' ? 'done' : 'fix';
+}
+
+/** すべて片付いたか（完了していて、レビュー期限があるならレビューも済んでいる） */
+export function isSettled(task: Pick<Task, 'status' | 'reviewed' | 'reviewDue'>): boolean {
+  return task.status === 'done' && (task.reviewed || task.reviewDue === null);
+}
+
+/**
+ * 期限の判定に使う日付 = まだ済んでいない「期限」と「レビュー期限」のうち早いほう。
+ * 期限とレビュー期限を同じ扱いにして、どちらの超過も見落とさないようにする。
+ * 完了したタスクの期限と、レビュー済みのレビュー期限は数えない。両方済んでいれば null。
+ */
+export function watchDueOf(task: Pick<Task, 'status' | 'dueDate' | 'reviewed' | 'reviewDue'>): string | null {
+  const due = task.status === 'done' ? null : task.dueDate;
+  const review = task.reviewed ? null : task.reviewDue;
+  if (due === null) return review;
+  if (review === null) return due;
+  return due <= review ? due : review;
 }
 
 export interface TaskDetail extends Task {
@@ -147,6 +187,8 @@ export interface CreateTaskInput {
   tagIds?: number[];
   channel?: TaskChannel | null;
   link?: string | null;
+  reviewDue?: string | null;
+  reviewed?: boolean;
 }
 
 export interface UpdateTaskInput {
@@ -161,6 +203,8 @@ export interface UpdateTaskInput {
   tagIds?: number[];
   channel?: TaskChannel | null;
   link?: string | null;
+  reviewDue?: string | null;
+  reviewed?: boolean;
 }
 
 export interface ReorderInput {

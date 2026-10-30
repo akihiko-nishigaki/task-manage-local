@@ -4,6 +4,8 @@ import {
   CHANNEL_LABELS,
   isSafeLink,
   PRIORITY_LABELS,
+  REVIEW_STATE_LABELS,
+  reviewStateOf,
   STATUS_LABELS,
   TASK_CHANNELS,
   TASK_PRIORITIES,
@@ -248,6 +250,30 @@ export function TaskDrawer({ taskId, onClose }: Props) {
               onChange={(e) => void updateTask(task.id, { dueDate: e.target.value || null })}
             />
 
+            <label htmlFor="d-review-due">レビュー期限</label>
+            <input
+              id="d-review-due"
+              type="date"
+              value={task.reviewDue ?? ''}
+              title="期限と同じ扱いで期限超過を見ます"
+              onChange={(e) => void updateTask(task.id, { reviewDue: e.target.value || null })}
+            />
+
+            <span className="grid-label">レビュー</span>
+            <div className="review-field">
+              <label className={`review-check review-${reviewStateOf(task)}`}>
+                <input
+                  type="checkbox"
+                  checked={task.reviewed}
+                  onChange={(e) => void updateTask(task.id, { reviewed: e.target.checked })}
+                />
+                <span className="review-check-label">{REVIEW_STATE_LABELS[reviewStateOf(task)]}</span>
+              </label>
+              <span className="field-hint muted">
+                レビューが終わったらチェック。直しが残っている間もオンのまま（＝レビュー修正）
+              </span>
+            </div>
+
             <label htmlFor="d-channel">チャネル</label>
             <select
               id="d-channel"
@@ -390,6 +416,12 @@ export function TaskDrawer({ taskId, onClose }: Props) {
               <dt>更新</dt>
               <dd>{formatDateTime(task.updatedAt)}</dd>
             </div>
+            {task.reviewedAt ? (
+              <div>
+                <dt>レビュー</dt>
+                <dd>{formatDateTime(task.reviewedAt)}</dd>
+              </div>
+            ) : null}
             {task.completedAt ? (
               <div>
                 <dt>完了</dt>

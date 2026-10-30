@@ -74,7 +74,10 @@
 - `members(id, name, active, created_at)`
 - `projects(id, name, description, color, archived, created_at, updated_at)`
 - `tags(id, name UNIQUE, color)`
-- `tasks(id, project_id FK, title, description, status, priority, assignee_id FK NULL, due_date, position, created_at, updated_at, completed_at, archived_at)`
+- `tasks(id, project_id FK, title, description, status, priority, assignee_id FK NULL, due_date, position, created_at, updated_at, completed_at, archived_at, channel, link, review_due, reviewed, reviewed_at)`
+  - `review_due` / `reviewed` / `reviewed_at` はレビュー（スキーマ v5）。ステータスは増やさず、
+    チェック（`reviewed`）と状態の組み合わせで レビュー前 / レビュー修正 / レビュー済 を表す（`shared/types.ts` の `reviewStateOf`）。
+    期限の判定は「期限」と「レビュー期限」のうちまだ済んでいない早いほうで行う（同 `watchDueOf`）
 - `task_tags(task_id, tag_id)`
 - `comments(id, task_id FK, author_id FK NULL, body, created_at)`
 - `schema_migrations(version)`

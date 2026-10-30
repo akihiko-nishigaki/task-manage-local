@@ -11,6 +11,7 @@ import {
   asObject,
   has,
   isDateString,
+  requireBoolean,
   requireColor,
   requireId,
   requireName,
@@ -69,6 +70,21 @@ function optDue(record: Record<string, unknown>): string | null {
     throw validationError('dueDate は YYYY-MM-DD 形式の日付である必要があります');
   }
   return value;
+}
+
+/** レビュー期限。古いエクスポート（項目なし）は null */
+function optReviewDue(record: Record<string, unknown>): string | null {
+  const value = record['reviewDue'];
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string' || !isDateString(value)) {
+    throw validationError('tasks[].reviewDue は YYYY-MM-DD 形式の日付である必要があります');
+  }
+  return value;
+}
+
+function optIsoOrNull(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === 'string' && value !== '' ? value : null;
 }
 
 interface ImportCounts {
@@ -177,11 +193,13 @@ export function transferRouter(db: Db): Router {
       const insertTask = db.prepare(
         mode === 'replace'
           ? `INSERT INTO tasks (id, project_id, title, description, status, priority, assignee_id,
-               due_date, position, created_at, updated_at, completed_at, archived_at, channel, link)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+               due_date, position, created_at, updated_at, completed_at, archived_at, channel, link,
+               review_due, reviewed, reviewed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           : `INSERT INTO tasks (project_id, title, description, status, priority, assignee_id,
-               due_date, position, created_at, updated_at, completed_at, archived_at, channel, link)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               due_date, position, created_at, updated_at, completed_at, archived_at, channel, link,
+               review_due, reviewed, reviewed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       const insertTaskTag = db.prepare('INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?, ?)');
       for (const record of tasks) {
@@ -223,6 +241,10 @@ export function transferRouter(db: Db): Router {
           // 古いエクスポート（項目なし）は未設定扱い。不正なリンクは取り込み時に弾く
           has(record, 'channel') ? requireNullableChannel(record['channel'], 'tasks[].channel') : null,
           has(record, 'link') ? requireNullableLink(record['link'], 'tasks[].link') : null,
+          // レビュー。古いエクスポート（項目なし）はレビュー期限なし・レビュー前として取り込む
+          optReviewDue(record),
+          sqlBool(has(record, 'reviewed') ? requireBoolean(record['reviewed'], 'tasks[].reviewed') : false),
+          optIsoOrNull(record, 'reviewedAt'),
         ] as const;
         const info = mode === 'replace' ? insertTask.run(oldId, ...values) : insertTask.run(...values);
         const newTaskId = mode === 'replace' ? oldId : Number(info.lastInsertRowid);

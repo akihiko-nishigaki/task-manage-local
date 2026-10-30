@@ -135,6 +135,18 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX idx_tasks_channel ON tasks(channel);
     `,
   },
+  {
+    // レビュー（レビュー期限と、レビューを実施したかのチェック）。
+    // ステータスの選択肢は増やさず、「レビュー」ステータスの中でレビュー前 / レビュー修正 / レビュー済を表す。
+    // CHECK 制約は変わらないので ALTER で足せる。
+    version: 5,
+    sql: `
+      ALTER TABLE tasks ADD COLUMN review_due TEXT;
+      ALTER TABLE tasks ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE tasks ADD COLUMN reviewed_at TEXT;
+      CREATE INDEX IF NOT EXISTS idx_tasks_review_due ON tasks(review_due);
+    `,
+  },
 ];
 
 /** このアプリが扱えるスキーマの最新版。 */

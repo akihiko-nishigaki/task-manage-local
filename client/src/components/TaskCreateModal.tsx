@@ -32,6 +32,7 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [assigneeId, setAssigneeId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState('');
+  const [reviewDue, setReviewDue] = useState('');
   const [tagIds, setTagIds] = useState<number[]>([]);
   const [channel, setChannel] = useState<TaskChannel | ''>('');
   const [link, setLink] = useState('');
@@ -50,6 +51,7 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
       priority,
       assigneeId,
       dueDate: dueDate || null,
+      reviewDue: reviewDue || null,
       channel: channel || null,
       link: link.trim() || null,
       tagIds,
@@ -167,6 +169,16 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="t-review-due">レビュー期限</label>
+          <input
+            id="t-review-due"
+            type="date"
+            value={reviewDue}
+            title="期限と同じ扱いで期限超過を見ます"
+            onChange={(e) => setReviewDue(e.target.value)}
           />
         </div>
       </div>

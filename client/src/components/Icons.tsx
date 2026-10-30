@@ -29,6 +29,14 @@ export const IconPlus = (p: Props) => (
   </Base>
 );
 
+/** 優先事項（ダッシュボード最上部）の旗 */
+export const IconFlag = (p: Props) => (
+  <Base {...p}>
+    <path d="M5 21V4" />
+    <path d="M5 4h12l-2.2 3.5L17 11H5" />
+  </Base>
+);
+
 export const IconSearch = (p: Props) => (
   <Base {...p}>
     <circle cx="11" cy="11" r="7" />

@@ -2,11 +2,20 @@ import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { Task, TaskStatus } from '@shared/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
-import { Assignee, ChannelBadge, PriorityBadge, TagChip, TaskLink } from '../components/Badges';
+import {
+  Assignee,
+  ChannelBadge,
+  PriorityBadge,
+  ReviewBadge,
+  ReviewDue,
+  TagChip,
+  TaskLink,
+} from '../components/Badges';
 import { IconArchive, IconPlus } from '../components/Icons';
 import { formatDueShort, isOverdue, isToday } from '../utils/date';
 import { BacklogToggle } from '../components/BacklogToggle';
 import { useShowBacklog, visibleStatuses } from '../utils/backlogVisibility';
+import { useToggleReviewed } from '../utils/review';
 
 interface Props {
   tasks: Task[];
@@ -25,6 +34,7 @@ const DRAG_MIME = 'text/plain';
 
 export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone }: Props) {
   const { memberById, tagById, reorderTasks, createTask, projectById } = useStore();
+  const toggleReviewed = useToggleReviewed();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [quickAddCol, setQuickAddCol] = useState<TaskStatus | null>(null);
@@ -188,6 +198,7 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
                         commitDrop(e, status);
                       }}
                       onClick={() => onOpenTask(t.id)}
+                      onContextMenu={(e) => toggleReviewed(t, e)}
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') onOpenTask(t.id);
@@ -206,6 +217,7 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
                       </div>
                       <div className="task-card-foot">
                         <PriorityBadge priority={t.priority} />
+                        <ReviewBadge task={t} />
                         <ChannelBadge channel={t.channel} />
                         <TaskLink link={t.link} compact />
                         <Assignee member={memberById(t.assigneeId)} />
@@ -218,6 +230,7 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
                             {formatDueShort(t.dueDate)}
                           </span>
                         ) : null}
+                        <ReviewDue due={t.reviewDue} reviewed={t.reviewed} />
                       </div>
                       {multiProject && project ? (
                         <span className="task-card-project">
