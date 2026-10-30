@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { Task, TaskStatus } from '@shared/types';
-import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
+import { activeOwnerIdOf, ownerIsReviewer, STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
 import {
   Assignee,
@@ -220,7 +220,7 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
                         <ReviewBadge task={t} />
                         <ChannelBadge channel={t.channel} />
                         <TaskLink link={t.link} compact />
-                        <Assignee member={memberById(t.assigneeId)} />
+                        <Assignee member={memberById(activeOwnerIdOf(t))} reviewer={ownerIsReviewer(t)} />
                         {t.dueDate ? (
                           <span
                             className={`due${overdue ? ' due-over' : ''}${

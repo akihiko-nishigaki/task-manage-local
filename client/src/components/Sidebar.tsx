@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { activeOwnerIdOf } from '@shared/types';
 import { useStore } from '../store';
 import { navigate, sameRoute, type Route } from '../router';
 import {
@@ -40,7 +41,7 @@ export function Sidebar({ route, onNewProject }: Props) {
     const map = new Map<number, number>();
     for (const t of tasks) {
       if (t.status === 'done' || t.status === 'backlog') continue;
-      if (!inUserScope(t.assigneeId)) continue;
+      if (!inUserScope(t)) continue;
       map.set(t.projectId, (map.get(t.projectId) ?? 0) + 1);
     }
     return map;
@@ -48,10 +49,14 @@ export function Sidebar({ route, onNewProject }: Props) {
 
   // 未完了にはプロダクトバックログ（着手前）を含めない
   const openAll = tasks.filter(
-    (t) => t.status !== 'done' && t.status !== 'backlog' && inUserScope(t.assigneeId),
+    (t) => t.status !== 'done' && t.status !== 'backlog' && inUserScope(t),
   ).length;
   const openMine = tasks.filter(
-    (t) => t.status !== 'done' && t.status !== 'backlog' && currentUserId !== null && t.assigneeId === currentUserId,
+    (t) =>
+      t.status !== 'done' &&
+      t.status !== 'backlog' &&
+      currentUserId !== null &&
+      activeOwnerIdOf(t) === currentUserId,
   ).length;
 
   const visibleProjects = projects.filter((p) => includeArchived || !p.archived);

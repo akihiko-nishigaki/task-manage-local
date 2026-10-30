@@ -197,7 +197,7 @@ test('マイグレーションが順に適用され、追加列が揃ってい�
     .all()
     .map((row) => Number(row['version']));
   // 版は 1 から連番で、抜けなく適用されていること（新しい版を足したらここも増える）
-  assert.deepEqual(versions, [1, 2, 3, 4, 5]);
+  assert.deepEqual(versions, [1, 2, 3, 4, 5, 6]);
   const cols = ctx.db.prepare('PRAGMA table_info(tasks)').all().map((row) => String(row['name']));
   assert.ok(cols.includes('archived_at'));
   assert.ok(cols.includes('channel'));
@@ -205,4 +205,5 @@ test('マイグレーションが順に適用され、追加列が揃ってい�
   assert.ok(cols.includes('review_due'));
   assert.ok(cols.includes('reviewed'));
   assert.ok(cols.includes('reviewed_at'));
+  assert.ok(cols.includes('reviewer_id'));
 });

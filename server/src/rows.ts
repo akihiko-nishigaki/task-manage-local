@@ -94,5 +94,6 @@ export function toTask(row: Row, tagIds: number[]): Task {
     reviewDue: optStr(row['review_due']),
     reviewed: bool(row['reviewed']),
     reviewedAt: optStr(row['reviewed_at']),
+    reviewerId: optNum(row['reviewer_id']),
   };
 }

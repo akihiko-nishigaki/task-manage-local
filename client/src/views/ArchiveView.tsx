@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Task } from '@shared/types';
+import { activeOwnerIdOf, ownerIsReviewer } from '@shared/types';
 import { ApiError, api } from '../api';
 import { useStore } from '../store';
 import { Assignee, TagList } from '../components/Badges';
@@ -44,8 +45,9 @@ export function ArchiveView() {
     const needle = q.trim().toLowerCase();
     return items.filter((t) => {
       if (fProject && t.projectId !== Number(fProject)) return false;
-      if (fAssignee === 'none' && t.assigneeId !== null) return false;
-      if (fAssignee && fAssignee !== 'none' && t.assigneeId !== Number(fAssignee)) return false;
+      const ownerId = activeOwnerIdOf(t);
+      if (fAssignee === 'none' && ownerId !== null) return false;
+      if (fAssignee && fAssignee !== 'none' && ownerId !== Number(fAssignee)) return false;
       if (needle && !t.title.toLowerCase().includes(needle) && !t.description.toLowerCase().includes(needle)) {
         return false;
       }
@@ -182,7 +184,7 @@ export function ArchiveView() {
                       )}
                     </td>
                     <td>
-                      <Assignee member={memberById(t.assigneeId)} />
+                      <Assignee member={memberById(activeOwnerIdOf(t))} reviewer={ownerIsReviewer(t)} />
                     </td>
                     <td>
                       <TagList

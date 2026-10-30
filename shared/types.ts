@@ -107,6 +107,7 @@ export interface Task {
   reviewDue: string | null; // レビュー期限 'YYYY-MM-DD'。期限（dueDate）と同じ扱いで期限超過を見る
   reviewed: boolean; // レビュー実施のチェック（下の ReviewState を参照）
   reviewedAt: string | null; // チェックを付けた日時（ISO 8601）
+  reviewerId: number | null; // レビュー者。assigneeId（作業者）とは別に持つ
 }
 
 /**
@@ -131,6 +132,33 @@ export function reviewStateOf(task: Pick<Task, 'reviewed' | 'status'>): ReviewSt
 /** すべて片付いたか（完了していて、レビュー期限があるならレビューも済んでいる） */
 export function isSettled(task: Pick<Task, 'status' | 'reviewed' | 'reviewDue'>): boolean {
   return task.status === 'done' && (task.reviewed || task.reviewDue === null);
+}
+
+/**
+ * レビュー待ち（レビュー者がボールを持っている状態）。
+ * ステータスが「レビュー」で、まだレビューのチェックが付いていないとき。
+ * 未着手・進行中はまだ作業中、レビュー修正（チェック済みで未完了）は直しの番なので作業者のまま。
+ */
+export function isAwaitingReview(task: Pick<Task, 'status' | 'reviewed'>): boolean {
+  return task.status === 'review' && !task.reviewed;
+}
+
+/**
+ * いまボールを持っている人（実質の担当）。
+ * レビュー待ちならレビュー者、それ以外は作業者。レビュー者が未設定なら作業者のまま。
+ * マイタスク・「現在のユーザー」・担当の絞り込みはこれで引く。
+ */
+export function activeOwnerIdOf(
+  task: Pick<Task, 'status' | 'reviewed' | 'assigneeId' | 'reviewerId'>,
+): number | null {
+  return isAwaitingReview(task) && task.reviewerId !== null ? task.reviewerId : task.assigneeId;
+}
+
+/** 実質の担当がレビュー者か（一覧の「R」の印に使う） */
+export function ownerIsReviewer(
+  task: Pick<Task, 'status' | 'reviewed' | 'reviewerId'>,
+): boolean {
+  return isAwaitingReview(task) && task.reviewerId !== null;
 }
 
 /**
@@ -189,6 +217,7 @@ export interface CreateTaskInput {
   link?: string | null;
   reviewDue?: string | null;
   reviewed?: boolean;
+  reviewerId?: number | null;
 }
 
 export interface UpdateTaskInput {
@@ -205,6 +234,7 @@ export interface UpdateTaskInput {
   link?: string | null;
   reviewDue?: string | null;
   reviewed?: boolean;
+  reviewerId?: number | null;
 }
 
 export interface ReorderInput {

@@ -223,7 +223,7 @@ export function TaskDrawer({ taskId, onClose }: Props) {
               ))}
             </select>
 
-            <label htmlFor="d-assignee">担当者</label>
+            <label htmlFor="d-assignee">作業者</label>
             <select
               id="d-assignee"
               value={task.assigneeId ?? ''}
@@ -234,6 +234,26 @@ export function TaskDrawer({ taskId, onClose }: Props) {
               }
             >
               <option value="">未割当</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                  {m.active ? '' : '（無効）'}
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor="d-reviewer">レビュー者</label>
+            <select
+              id="d-reviewer"
+              value={task.reviewerId ?? ''}
+              title="ステータスが「レビュー」でレビュー前のあいだは、このタスクはレビュー者のものとして扱います"
+              onChange={(e) =>
+                void updateTask(task.id, {
+                  reviewerId: e.target.value ? Number(e.target.value) : null,
+                })
+              }
+            >
+              <option value="">未設定</option>
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}

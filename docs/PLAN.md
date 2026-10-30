@@ -78,6 +78,9 @@
   - `review_due` / `reviewed` / `reviewed_at` はレビュー（スキーマ v5）。ステータスは増やさず、
     チェック（`reviewed`）と状態の組み合わせで レビュー前 / レビュー修正 / レビュー済 を表す（`shared/types.ts` の `reviewStateOf`）。
     期限の判定は「期限」と「レビュー期限」のうちまだ済んでいない早いほうで行う（同 `watchDueOf`）
+  - `reviewer_id` はレビュー者（スキーマ v6）。ステータスが `review` でレビュー前のあいだは、
+    そのタスクの持ち主を作業者（`assignee_id`）からレビュー者に切り替える（同 `activeOwnerIdOf`）。
+    マイタスク・「現在のユーザー」・担当の絞り込み・各画面の件数はこの持ち主で引く
 - `task_tags(task_id, tag_id)`
 - `comments(id, task_id FK, author_id FK NULL, body, created_at)`
 - `schema_migrations(version)`

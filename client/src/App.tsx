@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Project, Task } from '@shared/types';
+import { activeOwnerIdOf } from '@shared/types';
 import { useStore } from './store';
 import { navigate, useRoute } from './router';
 import { Sidebar } from './components/Sidebar';
@@ -77,7 +78,10 @@ export function App() {
     if (route.name === 'project') list = list.filter((t) => t.projectId === route.projectId);
     else if (route.name === 'mine')
       list = list.filter(
-        (t) => currentUserId !== null && t.assigneeId === currentUserId && visibleProjectIds.has(t.projectId),
+        (t) =>
+          currentUserId !== null &&
+          activeOwnerIdOf(t) === currentUserId &&
+          visibleProjectIds.has(t.projectId),
       );
     else list = list.filter((t) => visibleProjectIds.has(t.projectId));
 
@@ -85,7 +89,7 @@ export function App() {
     // （「未割当」なら誰にも割り当てられていないタスク）だけを見せる。
     // マイタスクは上の分岐で絞り済み。未選択（全員）のときは絞らない。
     if (route.name !== 'mine') {
-      list = list.filter((t) => inUserScope(t.assigneeId));
+      list = list.filter((t) => inUserScope(t));
     }
 
     const q = search.trim().toLowerCase();
@@ -226,7 +230,7 @@ export function App() {
                     t.projectId === activeProject.id &&
                     t.status !== 'backlog' &&
                     // 「現在のユーザー」で絞っているときは、表示中の件数と揃える
-                    inUserScope(t.assigneeId),
+                    inUserScope(t),
                 ).length
               }
             </span>

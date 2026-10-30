@@ -270,6 +270,8 @@ export function tasksRouter(db: Db): Router {
     const link = has(body, 'link') ? requireNullableLink(body['link']) : null;
     const reviewDue = has(body, 'reviewDue') ? requireNullableDate(body['reviewDue'], 'reviewDue') : null;
     const reviewed = has(body, 'reviewed') ? requireBoolean(body['reviewed'], 'reviewed') : false;
+    const reviewerId = has(body, 'reviewerId') ? requireNullableId(body['reviewerId'], 'reviewerId') : null;
+    ensureMember(db, reviewerId);
 
     const now = nowIso();
     const id = tx(db, () => {
@@ -277,8 +279,8 @@ export function tasksRouter(db: Db): Router {
         .prepare(
           `INSERT INTO tasks
              (project_id, title, description, status, priority, assignee_id, due_date, position,
-              created_at, updated_at, completed_at, channel, link, review_due, reviewed, reviewed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              created_at, updated_at, completed_at, channel, link, review_due, reviewed, reviewed_at, reviewer_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           projectId,
@@ -297,6 +299,7 @@ export function tasksRouter(db: Db): Router {
           reviewDue,
           sqlBool(reviewed),
           reviewed ? now : null,
+          reviewerId,
         );
       const newId = Number(info.lastInsertRowid);
       if (tagIds.length > 0) setTaskTags(db, newId, tagIds);
@@ -342,6 +345,11 @@ export function tasksRouter(db: Db): Router {
       const assigneeId = requireNullableId(body['assigneeId'], 'assigneeId');
       ensureMember(db, assigneeId);
       push('assignee_id = ?', assigneeId);
+    }
+    if (has(body, 'reviewerId')) {
+      const reviewerId = requireNullableId(body['reviewerId'], 'reviewerId');
+      ensureMember(db, reviewerId);
+      push('reviewer_id = ?', reviewerId);
     }
     if (has(body, 'dueDate')) push('due_date = ?', requireNullableDate(body['dueDate']));
     if (has(body, 'channel')) push('channel = ?', requireNullableChannel(body['channel']));

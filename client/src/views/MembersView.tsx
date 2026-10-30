@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Member } from '@shared/types';
+import { activeOwnerIdOf } from '@shared/types';
 import { useStore } from '../store';
 import { ConfirmDialog } from '../components/Modal';
 import { IconPlus, IconTrash } from '../components/Icons';
@@ -62,7 +63,10 @@ export function MembersView() {
             </thead>
             <tbody>
               {members.map((m) => {
-                const count = tasks.filter((t) => t.assigneeId === m.id && t.status !== 'done' && t.status !== 'backlog').length;
+                // 実質の担当（レビュー待ちはレビュー者）で数える
+                const count = tasks.filter(
+                  (t) => activeOwnerIdOf(t) === m.id && t.status !== 'done' && t.status !== 'backlog',
+                ).length;
                 return (
                   <tr key={m.id} className={m.active ? '' : 'row-muted'}>
                     <td>

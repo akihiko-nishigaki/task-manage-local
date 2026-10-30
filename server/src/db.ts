@@ -147,6 +147,16 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_tasks_review_due ON tasks(review_due);
     `,
   },
+  {
+    // レビュー者（作業者 assignee_id とは別）。
+    // ステータスが「レビュー」でレビュー前のあいだは、このタスクはレビュー者のものとして扱う
+    // （shared/types.ts の activeOwnerIdOf）。
+    version: 6,
+    sql: `
+      ALTER TABLE tasks ADD COLUMN reviewer_id INTEGER REFERENCES members(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_tasks_reviewer_id ON tasks(reviewer_id);
+    `,
+  },
 ];
 
 /** このアプリが扱えるスキーマの最新版。 */

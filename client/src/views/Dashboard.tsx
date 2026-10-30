@@ -1,6 +1,13 @@
 import { useMemo, useState, type DragEvent } from 'react';
 import type { Task, TaskPriority, TaskStatus } from '@shared/types';
-import { STATUS_LABELS, TASK_STATUSES, watchDueOf } from '@shared/types';
+import {
+  activeOwnerIdOf,
+  isSettled,
+  ownerIsReviewer,
+  STATUS_LABELS,
+  TASK_STATUSES,
+  watchDueOf,
+} from '@shared/types';
 import { useStore } from '../store';
 import {
   Assignee,
@@ -12,11 +19,11 @@ import {
   TaskLink,
 } from '../components/Badges';
 import { IconAlert, IconBoard, IconCalendar, IconFlag } from '../components/Icons';
-import { describeDue, formatDueShort, isOverdue, isWithinDays } from '../utils/date';
+import { describeDue, formatDueShort, isOverdue } from '../utils/date';
 import { BacklogToggle } from '../components/BacklogToggle';
 import { UserScopeHint } from '../components/UserScopeHint';
 import { useShowBacklog, visibleStatuses } from '../utils/backlogVisibility';
-import { isReviewPending, isWatchOverdue, isWatchWithinDays, useToggleReviewed } from '../utils/review';
+import { isWatchOverdue, isWatchWithinDays, useToggleReviewed } from '../utils/review';
 
 interface Props {
   tasks: Task[];
@@ -80,6 +87,7 @@ function MiniList({
   draggingId?: number | null;
 }) {
   const { memberById, projectById } = useStore();
+  const toggleReviewed = useToggleReviewed();
   if (tasks.length === 0) return <p className="muted card-empty">{empty}</p>;
   return (
     <ul className="mini-list">
@@ -91,6 +99,7 @@ function MiniList({
               type="button"
               className={`mini-row${draggingId === t.id ? ' dragging' : ''}`}
               onClick={() => onOpenTask(t.id)}
+              onContextMenu={(e) => toggleReviewed(t, e)}
               draggable={Boolean(onDragStartTask)}
               onDragStart={onDragStartTask ? (e) => onDragStartTask(e, t) : undefined}
               onDragEnd={onDragEnd}
@@ -104,16 +113,18 @@ function MiniList({
                       {project.name}
                     </span>
                   ) : null}
-                  <Assignee member={memberById(t.assigneeId)} />
+                  <Assignee member={memberById(activeOwnerIdOf(t))} reviewer={ownerIsReviewer(t)} />
                 </span>
               </span>
               <span className="mini-right">
                 <PriorityBadge priority={t.priority} />
+                <ReviewBadge task={t} />
                 {t.dueDate ? (
                   <span className={isOverdue(t.dueDate) && t.status !== 'done' ? 'due due-over' : 'due'}>
                     {describeDue(t.dueDate)}
                   </span>
                 ) : null}
+                <ReviewDue due={t.reviewDue} reviewed={t.reviewed} />
                 <StatusBadge status={t.status} />
               </span>
             </button>
@@ -124,119 +135,8 @@ function MiniList({
   );
 }
 
-/** 優先事項のまとまり（上から順に潰す）。 */
-type PriorityGroupKey = 'overdue' | 'week' | 'review';
-
-const PRIORITY_GROUP_LABELS: Record<PriorityGroupKey, string> = {
-  overdue: '期限超過',
-  week: '今週が期限',
-  review: 'レビュー期限が近い',
-};
-
-/**
- * ダッシュボード最上部の「優先事項」。
- * 優先度の入力項目は増やさず、期限だけで自動的に拾う。
- * 期限とレビュー期限は同じ扱いで見るので、どちらが迫っていても出る。
- */
-function PriorityPanel({ tasks, onOpenTask }: { tasks: Task[]; onOpenTask: (id: number) => void }) {
-  const { memberById, projectById } = useStore();
-  const toggleReviewed = useToggleReviewed();
-
-  const groups = useMemo(() => {
-    // プロダクトバックログはまだ着手前なので優先事項には入れない
-    const target = tasks.filter((t) => t.status !== 'backlog');
-    const overdue: Task[] = [];
-    const week: Task[] = [];
-    const review: Task[] = [];
-    for (const t of target) {
-      if (isWatchOverdue(t)) overdue.push(t);
-      else if (isWatchWithinDays(t, 7)) week.push(t);
-      else if (isReviewPending(t)) review.push(t);
-    }
-    const byWatchDue = (a: Task, b: Task) =>
-      (watchDueOf(a) ?? NO_DUE).localeCompare(watchDueOf(b) ?? NO_DUE) ||
-      PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
-      a.id - b.id;
-    return [
-      { key: 'overdue' as const, items: overdue.sort(byWatchDue) },
-      { key: 'week' as const, items: week.sort(byWatchDue) },
-      { key: 'review' as const, items: review.sort(byWatchDue) },
-    ].filter((g) => g.items.length > 0);
-  }, [tasks]);
-
-  const total = groups.reduce((n, g) => n + g.items.length, 0);
-
-  return (
-    <section className="card priority-panel">
-      <header className="card-head">
-        <span className="card-icon danger">
-          <IconFlag />
-        </span>
-        <h2>優先事項</h2>
-        <span className="muted head-hint">
-          期限 / レビュー期限が迫っている順。行を右クリックするとレビューを切り替えられます
-        </span>
-        <span className="card-count">{total}</span>
-      </header>
-
-      {total === 0 ? (
-        <p className="muted card-empty">期限・レビュー期限が迫っているタスクはありません。</p>
-      ) : (
-        <div className="priority-groups">
-          {groups.map((g) => (
-            <div key={g.key} className="priority-group">
-              <h3 className={`priority-group-head pg-${g.key}`}>
-                {PRIORITY_GROUP_LABELS[g.key]}
-                <span className="priority-group-count">{g.items.length}</span>
-              </h3>
-              <ul className="mini-list">
-                {g.items.slice(0, 8).map((t) => {
-                  const project = projectById(t.projectId);
-                  return (
-                    <li key={t.id}>
-                      <button
-                        type="button"
-                        className="mini-row"
-                        onClick={() => onOpenTask(t.id)}
-                        onContextMenu={(e) => toggleReviewed(t, e)}
-                      >
-                        <span className="mini-main">
-                          <span className="mini-title">{t.title}</span>
-                          <span className="mini-meta">
-                            {project ? (
-                              <span className="mini-project">
-                                <span className="color-dot" style={{ background: project.color }} />
-                                {project.name}
-                              </span>
-                            ) : null}
-                            <Assignee member={memberById(t.assigneeId)} />
-                          </span>
-                        </span>
-                        <span className="mini-right">
-                          <ReviewBadge task={t} />
-                          {t.dueDate ? (
-                            <span className={isOverdue(t.dueDate) && t.status !== 'done' ? 'due due-over' : 'due'}>
-                              {describeDue(t.dueDate)}
-                            </span>
-                          ) : null}
-                          <ReviewDue due={t.reviewDue} reviewed={t.reviewed} />
-                          <StatusBadge status={t.status} />
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-                {g.items.length > 8 ? (
-                  <li className="priority-more muted">他 {g.items.length - 8} 件</li>
-                ) : null}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
+/** 優先事項に出す優先度（高いもの）。 */
+const PRIORITY_FOCUS: TaskPriority[] = ['urgent', 'high'];
 
 export function Dashboard({ tasks, onOpenTask }: Props) {
   const { memberById, projectById, projects, updateTask } = useStore();
@@ -256,22 +156,29 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
   };
 
   // 「現在のユーザー」での絞り込みは App 側（scopedTasks）で済ませてから渡される。
-  // 未完了 = 着手対象のタスク。プロダクトバックログはまだ着手前なので期限超過・今週に含めない
-  const open = useMemo(() => tasks.filter((t) => t.status !== 'done' && t.status !== 'backlog'), [tasks]);
-
-  const overdue = useMemo(
-    () =>
-      open
-        .filter((t) => isOverdue(t.dueDate))
-        .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? '')),
-    [open],
+  // 未完了 = 着手対象のタスク。プロダクトバックログはまだ着手前なので期限超過・今週に含めない。
+  // 完了していてもレビュー期限が残っているものは、レビュー漏れを出さないために対象に残す（isSettled）
+  const open = useMemo(
+    () => tasks.filter((t) => t.status !== 'backlog' && !isSettled(t)),
+    [tasks],
   );
 
-  const upcoming = useMemo(
+  // 期限とレビュー期限は同じ扱いで見る（まだ済んでいない早いほう = watchDueOf）
+  const byWatchDue = (a: Task, b: Task) =>
+    (watchDueOf(a) ?? NO_DUE).localeCompare(watchDueOf(b) ?? NO_DUE) ||
+    PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
+    a.id - b.id;
+
+  const overdue = useMemo(() => open.filter(isWatchOverdue).sort(byWatchDue), [open]);
+
+  const upcoming = useMemo(() => open.filter((t) => isWatchWithinDays(t, 7)).sort(byWatchDue), [open]);
+
+  // 優先事項: 優先度が高いタスクだけ（日付では絞り込まない）。緊急 → 高 の順、同じなら締切が近い順
+  const focus = useMemo(
     () =>
       open
-        .filter((t) => isWithinDays(t.dueDate, 7))
-        .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? '')),
+        .filter((t) => PRIORITY_FOCUS.includes(t.priority))
+        .sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || byDue(a, b)),
     [open],
   );
 
@@ -349,9 +256,26 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
     <div className="dashboard">
       <UserScopeHint />
 
-      <PriorityPanel tasks={tasks} onOpenTask={onOpenTask} />
-
       <div className="dash-summary">
+        <section className="card">
+          <header className="card-head">
+            <span className="card-icon danger">
+              <IconFlag />
+            </span>
+            <h2>優先事項</h2>
+            <span className="muted head-hint">優先度が 緊急・高</span>
+            <span className="card-count">{focus.length}</span>
+          </header>
+          <MiniList
+            tasks={focus.slice(0, 12)}
+            onOpenTask={onOpenTask}
+            empty="優先度が高いタスクはありません。"
+            onDragStartTask={startDrag}
+            onDragEnd={endDrag}
+            draggingId={dragId}
+          />
+        </section>
+
         <section className="card">
           <header className="card-head">
             <span className="card-icon danger">
@@ -437,7 +361,7 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
                 <ul className="status-cards">
                   {shown.map((t) => {
                     const project = projectById(t.projectId);
-                    const member = memberById(t.assigneeId);
+                    const member = memberById(activeOwnerIdOf(t));
                     return (
                       <li key={t.id}>
                         <div
@@ -468,7 +392,7 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
                             <ReviewBadge task={t} />
                             <ChannelBadge channel={t.channel} />
                             <TaskLink link={t.link} compact />
-                            {member ? <Assignee member={member} /> : null}
+                            {member ? <Assignee member={member} reviewer={ownerIsReviewer(t)} /> : null}
                             {t.dueDate ? (
                               <span
                                 className={

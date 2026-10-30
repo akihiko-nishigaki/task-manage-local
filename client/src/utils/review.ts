@@ -3,12 +3,9 @@
 import { useCallback } from 'react';
 import type { MouseEvent } from 'react';
 import type { Task } from '@shared/types';
-import { isSettled, watchDueOf } from '@shared/types';
+import { watchDueOf } from '@shared/types';
 import { useStore } from '../store';
 import { addDays, today } from './date';
-
-/** レビュー期限が「近い」とみなす日数。 */
-export const REVIEW_SOON_DAYS = 7;
 
 /**
  * レビューの切り替え。一覧・カード・ボードの右クリック（onContextMenu）から使う。
@@ -42,13 +39,3 @@ export function isWatchWithinDays(task: Task, days: number): boolean {
   return due >= today() && due <= addDays(today(), days);
 }
 
-/** レビュー期限が近い（または過ぎている）のに、まだレビューしていない。 */
-export function isReviewPending(task: Task): boolean {
-  if (task.reviewed || task.reviewDue === null) return false;
-  return task.reviewDue <= addDays(today(), REVIEW_SOON_DAYS);
-}
-
-/** まだ片付いていない（完了していない、または完了していてもレビュー期限が残っている）。 */
-export function isOpenTask(task: Task): boolean {
-  return !isSettled(task);
-}

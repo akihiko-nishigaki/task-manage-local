@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Task, TaskPriority, TaskStatus } from '@shared/types';
-import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
+import { activeOwnerIdOf, ownerIsReviewer, STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
 import {
   Assignee,
@@ -47,8 +47,8 @@ export function ListView({ tasks, onOpenTask }: Props) {
         case 'priority':
           return (PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]) * dir;
         case 'assignee': {
-          const an = memberById(a.assigneeId)?.name ?? '';
-          const bn = memberById(b.assigneeId)?.name ?? '';
+          const an = memberById(activeOwnerIdOf(a))?.name ?? '';
+          const bn = memberById(activeOwnerIdOf(b))?.name ?? '';
           return an.localeCompare(bn, 'ja') * dir;
         }
         case 'dueDate': {
@@ -138,7 +138,7 @@ export function ListView({ tasks, onOpenTask }: Props) {
                     <PriorityBadge priority={t.priority} />
                   </td>
                   <td>
-                    <Assignee member={memberById(t.assigneeId)} />
+                    <Assignee member={memberById(activeOwnerIdOf(t))} reviewer={ownerIsReviewer(t)} />
                   </td>
                   <td>
                     <DueDate due={t.dueDate} done={t.status === 'done' || t.status === 'backlog'} />

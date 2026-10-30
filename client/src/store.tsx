@@ -28,7 +28,11 @@ import type {
   UpdateTaskInput,
   WorkspaceInfo,
 } from '@shared/types';
+import { activeOwnerIdOf } from '@shared/types';
 import { ApiError, api, getActiveWorkspaceId, setActiveWorkspaceId } from './api';
+
+/** 「実質の担当」の判定に必要な項目だけ（Task をまるごと渡さなくてよいように） */
+export type TaskOwnerFields = Pick<Task, 'status' | 'reviewed' | 'assigneeId' | 'reviewerId'>;
 
 export interface Toast {
   id: number;
@@ -81,8 +85,11 @@ interface StoreValue {
   unassignedOnly: boolean;
   /** 「未割当」を選ぶ。メンバーや（全員）に戻すときは setCurrentUserId を使う */
   selectUnassigned: () => void;
-  /** 「現在のユーザー」の選択に合うタスクか（担当者 ID で判定。（全員）なら常に true） */
-  inUserScope: (assigneeId: number | null) => boolean;
+  /**
+   * 「現在のユーザー」の選択に合うタスクか。
+   * 判定は「実質の担当」（レビュー待ちならレビュー者、それ以外は作業者）。（全員）なら常に true
+   */
+  inUserScope: (task: TaskOwnerFields) => boolean;
 
   /** 切り替えて使えるデータ（共有 / 個人など）。1 つだけのときは切り替えの表示を出さない */
   workspaces: WorkspaceInfo[];
@@ -203,9 +210,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // 「実質の担当」で引く。レビュー待ち（ステータスがレビュー・レビュー前）のタスクはレビュー者のもの、
+  // それ以外は作業者のものとして扱う（shared/types.ts の activeOwnerIdOf）
   const inUserScope = useCallback(
-    (assigneeId: number | null) =>
-      unassignedOnly ? assigneeId === null : currentUserId === null || assigneeId === currentUserId,
+    (task: TaskOwnerFields) => {
+      const ownerId = activeOwnerIdOf(task);
+      return unassignedOnly ? ownerId === null : currentUserId === null || ownerId === currentUserId;
+    },
     [unassignedOnly, currentUserId],
   );
 
@@ -362,8 +373,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setMembers((prev) => prev.filter((m) => m.id !== id));
       try {
         await api.deleteMember(id);
+        // サーバー側は ON DELETE SET NULL。作業者とレビュー者の両方を手元の状態からも外す
         setTasks((prev) =>
-          prev.map((t) => (t.assigneeId === id ? { ...t, assigneeId: null } : t)),
+          prev.map((t) => ({
+            ...t,
+            assigneeId: t.assigneeId === id ? null : t.assigneeId,
+            reviewerId: t.reviewerId === id ? null : t.reviewerId,
+          })),
         );
         if (currentUserId === id) setCurrentUserId(null);
         pushToast('success', 'メンバーを削除しました。');

@@ -43,10 +43,19 @@ export function TagList({ tags }: { tags: Tag[] }) {
   );
 }
 
-export function Assignee({ member }: { member: Member | null }) {
-  if (!member) return <span className="muted">未割当</span>;
+/**
+ * 担当の表示。reviewer を渡すと「R」の印を付け、いまボールを持っているのが
+ * レビュー者であることを示す（レビュー待ちのタスク）。
+ */
+export function Assignee({ member, reviewer = false }: { member: Member | null; reviewer?: boolean }) {
+  if (!member) return <span className="muted">{reviewer ? 'レビュー者未定' : '未割当'}</span>;
   return (
-    <span className="assignee">
+    <span className={`assignee${reviewer ? ' assignee-reviewer' : ''}`}>
+      {reviewer ? (
+        <span className="owner-mark" title="レビュー待ち（レビュー者のタスク）">
+          R
+        </span>
+      ) : null}
       <span className="avatar" aria-hidden="true">
         {member.name.slice(0, 1)}
       </span>

@@ -590,6 +590,25 @@ textarea {
   color: var(--ok);
 }
 
+/* 実質の担当がレビュー者のときに付ける「R」の印 */
+.owner-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  background: #f3e8fd;
+  color: #7526c4;
+}
+
+.assignee-reviewer {
+  font-weight: 600;
+}
+
 .review-check {
   display: inline-flex;
   align-items: center;
@@ -618,49 +637,6 @@ textarea {
   align-items: flex-start;
 }
 
-/* 優先事項（ダッシュボード最上部） */
-.priority-panel {
-  border-left: 3px solid var(--danger);
-}
-
-.priority-groups {
-  display: flex;
-  flex-direction: column;
-}
-
-.priority-group + .priority-group {
-  border-top: 1px solid var(--border);
-}
-
-.priority-group-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 6px 14px;
-  font-size: 11.5px;
-  font-weight: 600;
-  background: var(--bg);
-  color: var(--text-muted);
-}
-
-.priority-group-head.pg-overdue {
-  background: var(--danger-weak);
-  color: var(--danger);
-}
-.priority-group-head.pg-week {
-  background: var(--warn-weak);
-  color: var(--warn);
-}
-
-.priority-group-count {
-  font-variant-numeric: tabular-nums;
-}
-
-.priority-more {
-  padding: 6px 14px;
-  font-size: 11.5px;
-}
 
 .due {
   white-space: nowrap;
@@ -832,6 +808,19 @@ textarea {
   font-size: 11.5px;
   color: var(--text-muted);
   align-items: center;
+  min-width: 0;
+}
+
+/* カードが 3 枚並んで幅が狭くなっても、プロジェクト名で 2 行にならないようにする */
+.mini-meta .mini-project {
+  min-width: 0;
+}
+
+.mini-meta .mini-project,
+.mini-meta .assignee-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mini-project {
@@ -843,8 +832,10 @@ textarea {
 .mini-right {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  flex: 0 1 auto;
 }
 
 /* ---------- リスト ---------- */

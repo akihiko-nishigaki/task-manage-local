@@ -1,7 +1,14 @@
 // レビュー（レビュー期限・レビュー実施のチェック）。スキーマ v5。
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { reviewStateOf, isSettled, watchDueOf } from '../../shared/types.js';
+import {
+  activeOwnerIdOf,
+  isAwaitingReview,
+  isSettled,
+  ownerIsReviewer,
+  reviewStateOf,
+  watchDueOf,
+} from '../../shared/types.js';
 import type { Task } from '../../shared/types.js';
 import { createContext, seed } from './helpers.js';
 
@@ -172,6 +179,100 @@ test('完了していてもレビューが済んでいなければ片付いて�
   assert.equal(isSettled({ status: 'done', reviewed: false, reviewDue: '2026-05-02' }), false);
   assert.equal(isSettled({ status: 'done', reviewed: true, reviewDue: '2026-05-02' }), true);
   assert.equal(isSettled({ status: 'review', reviewed: true, reviewDue: '2026-05-02' }), false);
+});
+
+test('レビュー者を設定・変更・解除でき、存在しないメンバーは 404 になる', async (t) => {
+  const ctx = await createContext();
+  t.after(() => ctx.close());
+  const { projectId, memberId } = await seed(ctx);
+  const reviewer = await ctx.post('/api/members', { name: 'レビュー担当' });
+
+  const created = await ctx.post('/api/tasks', {
+    projectId,
+    title: 'レビュー者つき',
+    assigneeId: memberId,
+    reviewerId: reviewer.data.id,
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.data.assigneeId, memberId);
+  assert.equal(created.data.reviewerId, reviewer.data.id);
+
+  const cleared = await ctx.patch(`/api/tasks/${created.data.id}`, { reviewerId: null });
+  assert.equal(cleared.data.reviewerId, null);
+
+  const back = await ctx.patch(`/api/tasks/${created.data.id}`, { reviewerId: reviewer.data.id });
+  assert.equal(back.data.reviewerId, reviewer.data.id);
+
+  const missing = await ctx.patch(`/api/tasks/${created.data.id}`, { reviewerId: 9999 });
+  assert.equal(missing.status, 404);
+});
+
+test('メンバーを削除するとレビュー者の指定だけが外れる', async (t) => {
+  const ctx = await createContext();
+  t.after(() => ctx.close());
+  const { projectId, memberId } = await seed(ctx);
+  const reviewer = await ctx.post('/api/members', { name: '辞めるレビュー担当' });
+  const created = await ctx.post('/api/tasks', {
+    projectId,
+    title: 'レビュー者が消える',
+    assigneeId: memberId,
+    reviewerId: reviewer.data.id,
+  });
+
+  await ctx.del(`/api/members/${reviewer.data.id}`);
+  const after = await ctx.get(`/api/tasks/${created.data.id}`);
+  assert.equal(after.data.reviewerId, null);
+  assert.equal(after.data.assigneeId, memberId);
+});
+
+test('レビュー者もエクスポート・インポートで往復する', async (t) => {
+  const ctx = await createContext();
+  t.after(() => ctx.close());
+  const { projectId, memberId } = await seed(ctx);
+  const reviewer = await ctx.post('/api/members', { name: '往復レビュー担当' });
+  await ctx.post('/api/tasks', {
+    projectId,
+    title: 'レビュー者つきの往復',
+    status: 'review',
+    assigneeId: memberId,
+    reviewerId: reviewer.data.id,
+  });
+
+  const exported = await ctx.get('/api/export');
+  await ctx.post('/api/import', { mode: 'replace', data: exported.data });
+  const after = await ctx.get('/api/tasks');
+  const task = after.data.find((x: Task) => x.title === 'レビュー者つきの往復');
+  assert.equal(task.reviewerId, reviewer.data.id);
+  assert.equal(task.assigneeId, memberId);
+});
+
+test('実質の担当は、レビュー待ちならレビュー者・それ以外は作業者', () => {
+  const base = { assigneeId: 1, reviewerId: 2, reviewed: false };
+
+  // レビュー待ち（ステータスがレビュー・レビュー前）だけレビュー者
+  assert.equal(activeOwnerIdOf({ ...base, status: 'review' }), 2);
+  assert.equal(ownerIsReviewer({ ...base, status: 'review' }), true);
+  assert.equal(isAwaitingReview({ status: 'review', reviewed: false }), true);
+
+  // 未着手・進行中はまだ作業中なので作業者
+  assert.equal(activeOwnerIdOf({ ...base, status: 'todo' }), 1);
+  assert.equal(activeOwnerIdOf({ ...base, status: 'in_progress' }), 1);
+  assert.equal(activeOwnerIdOf({ ...base, status: 'backlog' }), 1);
+  assert.equal(ownerIsReviewer({ ...base, status: 'in_progress' }), false);
+
+  // レビュー修正（チェック済みで未完了）は直しの番なので作業者に戻る
+  assert.equal(activeOwnerIdOf({ ...base, status: 'review', reviewed: true }), 1);
+  assert.equal(isAwaitingReview({ status: 'review', reviewed: true }), false);
+
+  // 完了も作業者
+  assert.equal(activeOwnerIdOf({ ...base, status: 'done', reviewed: true }), 1);
+
+  // レビュー者が未設定ならレビュー待ちでも作業者のまま
+  assert.equal(activeOwnerIdOf({ assigneeId: 1, reviewerId: null, reviewed: false, status: 'review' }), 1);
+  assert.equal(ownerIsReviewer({ reviewerId: null, reviewed: false, status: 'review' }), false);
+
+  // 作業者が未割当でも、レビュー待ちならレビュー者が持つ
+  assert.equal(activeOwnerIdOf({ assigneeId: null, reviewerId: 2, reviewed: false, status: 'review' }), 2);
 });
 
 test('レビューの段階はチェックと状態の組み合わせで決まる', () => {

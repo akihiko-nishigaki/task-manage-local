@@ -194,12 +194,12 @@ export function transferRouter(db: Db): Router {
         mode === 'replace'
           ? `INSERT INTO tasks (id, project_id, title, description, status, priority, assignee_id,
                due_date, position, created_at, updated_at, completed_at, archived_at, channel, link,
-               review_due, reviewed, reviewed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+               review_due, reviewed, reviewed_at, reviewer_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           : `INSERT INTO tasks (project_id, title, description, status, priority, assignee_id,
                due_date, position, created_at, updated_at, completed_at, archived_at, channel, link,
-               review_due, reviewed, reviewed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               review_due, reviewed, reviewed_at, reviewer_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       const insertTaskTag = db.prepare('INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?, ?)');
       for (const record of tasks) {
@@ -213,6 +213,11 @@ export function transferRouter(db: Db): Router {
           ? requireNullableId(record['assigneeId'], 'tasks[].assigneeId')
           : null;
         const assigneeId = oldAssignee === null ? null : memberIds.get(oldAssignee) ?? null;
+        // レビュー者も作業者と同じ手順で、新しいメンバー ID に付け替える
+        const oldReviewer = has(record, 'reviewerId')
+          ? requireNullableId(record['reviewerId'], 'tasks[].reviewerId')
+          : null;
+        const reviewerId = oldReviewer === null ? null : memberIds.get(oldReviewer) ?? null;
         const status = has(record, 'status') ? requireStatus(record['status'], 'tasks[].status') : 'todo';
         const completedAtRaw = record['completedAt'];
         const completedAt =
@@ -245,6 +250,7 @@ export function transferRouter(db: Db): Router {
           optReviewDue(record),
           sqlBool(has(record, 'reviewed') ? requireBoolean(record['reviewed'], 'tasks[].reviewed') : false),
           optIsoOrNull(record, 'reviewedAt'),
+          reviewerId,
         ] as const;
         const info = mode === 'replace' ? insertTask.run(oldId, ...values) : insertTask.run(...values);
         const newTaskId = mode === 'replace' ? oldId : Number(info.lastInsertRowid);

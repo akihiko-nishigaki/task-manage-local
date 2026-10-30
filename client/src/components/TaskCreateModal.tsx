@@ -31,6 +31,7 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
   const [status, setStatus] = useState<TaskStatus>(defaultStatus ?? 'todo');
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [assigneeId, setAssigneeId] = useState<number | null>(null);
+  const [reviewerId, setReviewerId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState('');
   const [reviewDue, setReviewDue] = useState('');
   const [tagIds, setTagIds] = useState<number[]>([]);
@@ -50,6 +51,7 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
       status,
       priority,
       assigneeId,
+      reviewerId,
       dueDate: dueDate || null,
       reviewDue: reviewDue || null,
       channel: channel || null,
@@ -146,13 +148,31 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
           </select>
         </div>
         <div className="field">
-          <label htmlFor="t-assignee">担当者</label>
+          <label htmlFor="t-assignee">作業者</label>
           <select
             id="t-assignee"
             value={assigneeId ?? ''}
             onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : null)}
           >
             <option value="">未割当</option>
+            {members
+              .filter((m) => m.active)
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="t-reviewer">レビュー者</label>
+          <select
+            id="t-reviewer"
+            value={reviewerId ?? ''}
+            title="ステータスが「レビュー」でレビュー前のあいだは、このタスクはレビュー者のものとして扱います"
+            onChange={(e) => setReviewerId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">未設定</option>
             {members
               .filter((m) => m.active)
               .map((m) => (
