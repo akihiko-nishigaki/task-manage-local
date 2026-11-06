@@ -575,19 +575,15 @@ textarea {
   color: var(--text-muted);
 }
 
-/* レビュー（レビュー前 / レビュー修正 / レビュー済）。
-   ステータスの「レビュー」（紫）と並べても見分けられるよう、修正待ちは橙にする */
+/* レビュー（レビュー前 / レビュー後修正あり）。
+   ステータスの「レビュー」（紫）と並べても見分けられるよう、修正ありは橙にする */
 .review-before {
   background: #eef1f4;
   color: #4b5563;
 }
-.review-fix {
+.review-fixed {
   background: var(--warn-weak);
   color: var(--warn);
-}
-.review-done {
-  background: var(--ok-weak);
-  color: var(--ok);
 }
 
 /* 実質の担当がレビュー者のときに付ける「R」の印 */
@@ -607,6 +603,20 @@ textarea {
 
 .assignee-reviewer {
   font-weight: 600;
+}
+
+/* 一覧の担当セル: 作業者とレビュー者を縦に並べる */
+.owner-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+
+/* いまボールを持っていないほうは控えめに */
+.assignee-dim {
+  opacity: 0.55;
+  font-weight: 400;
 }
 
 .review-check {

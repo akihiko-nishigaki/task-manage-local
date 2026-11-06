@@ -113,20 +113,21 @@ export interface Task {
 /**
  * レビューの段階。
  * ステータス（未着手 / 進行中 / レビュー / 完了）の選択肢は増やさず、
- * 「レビュー」ステータスの中でレビュー前か後かが分かるように、チェック 1 個と状態の組み合わせで表す。
+ * 「レビュー後修正あり」のチェック 1 個で、レビュー前か後かを表す。
  */
-export type ReviewState = 'before' | 'fix' | 'done';
+export type ReviewState = 'before' | 'fixed';
+
+/** チェックボックスの名前。チェックの ON / OFF では変えない */
+export const REVIEW_CHECK_LABEL = 'レビュー後修正あり';
 
 export const REVIEW_STATE_LABELS: Record<ReviewState, string> = {
   before: 'レビュー前',
-  fix: 'レビュー修正',
-  done: 'レビュー済',
+  fixed: REVIEW_CHECK_LABEL,
 };
 
-/** チェック OFF = レビュー前 / ON かつ未完了 = レビュー修正（指摘の直し待ち）/ ON かつ完了 = レビュー済 */
-export function reviewStateOf(task: Pick<Task, 'reviewed' | 'status'>): ReviewState {
-  if (!task.reviewed) return 'before';
-  return task.status === 'done' ? 'done' : 'fix';
+/** チェック OFF = レビュー前 / ON = レビュー後修正あり */
+export function reviewStateOf(task: Pick<Task, 'reviewed'>): ReviewState {
+  return task.reviewed ? 'fixed' : 'before';
 }
 
 /** すべて片付いたか（完了していて、レビュー期限があるならレビューも済んでいる） */
@@ -137,7 +138,7 @@ export function isSettled(task: Pick<Task, 'status' | 'reviewed' | 'reviewDue'>)
 /**
  * レビュー待ち（レビュー者がボールを持っている状態）。
  * ステータスが「レビュー」で、まだレビューのチェックが付いていないとき。
- * 未着手・進行中はまだ作業中、レビュー修正（チェック済みで未完了）は直しの番なので作業者のまま。
+ * 未着手・進行中はまだ作業中、チェック済み（レビュー後修正あり）は直しの番なので作業者のまま。
  */
 export function isAwaitingReview(task: Pick<Task, 'status' | 'reviewed'>): boolean {
   return task.status === 'review' && !task.reviewed;
@@ -164,7 +165,7 @@ export function ownerIsReviewer(
 /**
  * 期限の判定に使う日付 = まだ済んでいない「期限」と「レビュー期限」のうち早いほう。
  * 期限とレビュー期限を同じ扱いにして、どちらの超過も見落とさないようにする。
- * 完了したタスクの期限と、レビュー済みのレビュー期限は数えない。両方済んでいれば null。
+ * 完了したタスクの期限と、チェック済みのレビュー期限は数えない。両方済んでいれば null。
  */
 export function watchDueOf(task: Pick<Task, 'status' | 'dueDate' | 'reviewed' | 'reviewDue'>): string | null {
   const due = task.status === 'done' ? null : task.dueDate;

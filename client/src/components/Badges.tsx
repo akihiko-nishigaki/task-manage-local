@@ -3,6 +3,7 @@ import {
   CHANNEL_LABELS,
   isSafeLink,
   PRIORITY_LABELS,
+  REVIEW_CHECK_LABEL,
   REVIEW_STATE_LABELS,
   reviewStateOf,
   STATUS_LABELS,
@@ -47,10 +48,19 @@ export function TagList({ tags }: { tags: Tag[] }) {
  * 担当の表示。reviewer を渡すと「R」の印を付け、いまボールを持っているのが
  * レビュー者であることを示す（レビュー待ちのタスク）。
  */
-export function Assignee({ member, reviewer = false }: { member: Member | null; reviewer?: boolean }) {
+export function Assignee({
+  member,
+  reviewer = false,
+  dim = false,
+}: {
+  member: Member | null;
+  reviewer?: boolean;
+  /** いまボールを持っていない側（作業者・レビュー者を並べて出すときに控えめにする） */
+  dim?: boolean;
+}) {
   if (!member) return <span className="muted">{reviewer ? 'レビュー者未定' : '未割当'}</span>;
   return (
-    <span className={`assignee${reviewer ? ' assignee-reviewer' : ''}`}>
+    <span className={`assignee${reviewer ? ' assignee-reviewer' : ''}${dim ? ' assignee-dim' : ''}`}>
       {reviewer ? (
         <span className="owner-mark" title="レビュー待ち（レビュー者のタスク）">
           R
@@ -75,7 +85,7 @@ export function DueDate({ due, done = false }: { due: string | null; done?: bool
   );
 }
 
-/** レビュー期限。レビュー済みなら警告色を出さない */
+/** レビュー期限。チェック済みなら警告色を出さない */
 export function ReviewDue({ due, reviewed }: { due: string | null; reviewed: boolean }) {
   if (!due) return null;
   const overdue = !reviewed && isOverdue(due);
@@ -109,16 +119,16 @@ export function ReviewCheck({ task, onToggle }: { task: Task; onToggle: (task: T
   return (
     <label
       className={`review-check review-${state}`}
-      title="レビューが終わったらチェック（行の右クリックでも切り替えられます）"
+      title="レビュー後に修正が出たらチェック（行の右クリックでも切り替えられます）"
       onClick={(e) => e.stopPropagation()}
     >
       <input
         type="checkbox"
         checked={task.reviewed}
         onChange={() => onToggle(task)}
-        aria-label={`${task.title} のレビュー`}
+        aria-label={`${task.title} の${REVIEW_CHECK_LABEL}`}
       />
-      <span className="review-check-label">{REVIEW_STATE_LABELS[state]}</span>
+      <span className="review-check-label">{REVIEW_CHECK_LABEL}</span>
     </label>
   );
 }

@@ -4,7 +4,7 @@ import {
   CHANNEL_LABELS,
   isSafeLink,
   PRIORITY_LABELS,
-  REVIEW_STATE_LABELS,
+  REVIEW_CHECK_LABEL,
   reviewStateOf,
   STATUS_LABELS,
   TASK_CHANNELS,
@@ -287,10 +287,10 @@ export function TaskDrawer({ taskId, onClose }: Props) {
                   checked={task.reviewed}
                   onChange={(e) => void updateTask(task.id, { reviewed: e.target.checked })}
                 />
-                <span className="review-check-label">{REVIEW_STATE_LABELS[reviewStateOf(task)]}</span>
+                <span className="review-check-label">{REVIEW_CHECK_LABEL}</span>
               </label>
               <span className="field-hint muted">
-                レビューが終わったらチェック。直しが残っている間もオンのまま（＝レビュー修正）
+                レビュー後に修正が出たらチェック（ダッシュボードでは「レビュー後修正あり」と出ます）
               </span>
             </div>
 

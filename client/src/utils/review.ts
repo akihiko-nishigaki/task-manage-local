@@ -9,7 +9,7 @@ import { addDays, today } from './date';
 
 /**
  * レビューの切り替え。一覧・カード・ボードの右クリック（onContextMenu）から使う。
- * ブラウザのメニューは出さず、レビュー済み ⇔ レビュー前を切り替える。
+ * ブラウザのメニューは出さず、「レビュー後修正あり」のチェックを切り替える。
  */
 export function useToggleReviewed(): (task: Task, e?: MouseEvent) => void {
   const { updateTask, pushToast } = useStore();
@@ -19,14 +19,14 @@ export function useToggleReviewed(): (task: Task, e?: MouseEvent) => void {
       e?.stopPropagation();
       const next = !task.reviewed;
       void updateTask(task.id, { reviewed: next }).then(() => {
-        pushToast('success', next ? 'レビュー済みにしました' : 'レビュー前に戻しました');
+        pushToast('success', next ? 'レビュー後修正ありにしました' : 'レビュー前に戻しました');
       });
     },
     [updateTask, pushToast],
   );
 }
 
-/** 期限・レビュー期限のどちらかが超過しているか（完了・レビュー済みの側は数えない）。 */
+/** 期限・レビュー期限のどちらかが超過しているか（完了・チェック済みの側は数えない）。 */
 export function isWatchOverdue(task: Task): boolean {
   const due = watchDueOf(task);
   return due !== null && due < today();

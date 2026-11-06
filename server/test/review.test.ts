@@ -6,6 +6,8 @@ import {
   isAwaitingReview,
   isSettled,
   ownerIsReviewer,
+  REVIEW_CHECK_LABEL,
+  REVIEW_STATE_LABELS,
   reviewStateOf,
   watchDueOf,
 } from '../../shared/types.js';
@@ -83,7 +85,7 @@ test('レビュー期限は更新・解除でき、不正な値は 400 になる
   assert.equal(badBool.status, 400);
 });
 
-test('ステータスを変えてもレビューのチェックは保たれる（レビュー修正 → レビュー済）', async (t) => {
+test('ステータスを変えてもレビューのチェックは保たれる', async (t) => {
   const ctx = await createContext();
   t.after(() => ctx.close());
   const { projectId } = await seed(ctx);
@@ -92,11 +94,11 @@ test('ステータスを変えてもレビューのチェックは保たれる�
 
   await ctx.patch(`/api/tasks/${id}`, { reviewed: true });
   const fixing = await ctx.get(`/api/tasks/${id}`);
-  assert.equal(reviewStateOf(fixing.data as Task), 'fix');
+  assert.equal(reviewStateOf(fixing.data as Task), 'fixed');
 
   const done = await ctx.patch(`/api/tasks/${id}`, { status: 'done' });
   assert.equal(done.data.reviewed, true);
-  assert.equal(reviewStateOf(done.data as Task), 'done');
+  assert.equal(reviewStateOf(done.data as Task), 'fixed');
 });
 
 test('エクスポートとインポートでレビューの内容が往復する', async (t) => {
@@ -275,10 +277,11 @@ test('実質の担当は、レビュー待ちならレビュー者・それ以�
   assert.equal(activeOwnerIdOf({ assigneeId: null, reviewerId: 2, reviewed: false, status: 'review' }), 2);
 });
 
-test('レビューの段階はチェックと状態の組み合わせで決まる', () => {
-  assert.equal(reviewStateOf({ reviewed: false, status: 'review' }), 'before');
-  assert.equal(reviewStateOf({ reviewed: false, status: 'done' }), 'before');
-  assert.equal(reviewStateOf({ reviewed: true, status: 'review' }), 'fix');
-  assert.equal(reviewStateOf({ reviewed: true, status: 'in_progress' }), 'fix');
-  assert.equal(reviewStateOf({ reviewed: true, status: 'done' }), 'done');
+test('レビューの段階はチェックの ON / OFF だけで決まる', () => {
+  assert.equal(reviewStateOf({ reviewed: false }), 'before');
+  assert.equal(reviewStateOf({ reviewed: true }), 'fixed');
+  assert.equal(REVIEW_STATE_LABELS[reviewStateOf({ reviewed: false })], 'レビュー前');
+  assert.equal(REVIEW_STATE_LABELS[reviewStateOf({ reviewed: true })], 'レビュー後修正あり');
+  // チェックボックスの名前は ON / OFF で変えない
+  assert.equal(REVIEW_CHECK_LABEL, 'レビュー後修正あり');
 });

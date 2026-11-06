@@ -76,7 +76,7 @@
 - `tags(id, name UNIQUE, color)`
 - `tasks(id, project_id FK, title, description, status, priority, assignee_id FK NULL, due_date, position, created_at, updated_at, completed_at, archived_at, channel, link, review_due, reviewed, reviewed_at)`
   - `review_due` / `reviewed` / `reviewed_at` はレビュー（スキーマ v5）。ステータスは増やさず、
-    チェック（`reviewed`）と状態の組み合わせで レビュー前 / レビュー修正 / レビュー済 を表す（`shared/types.ts` の `reviewStateOf`）。
+    チェック（`reviewed`）1 個で レビュー前 / レビュー後修正あり を表す（`shared/types.ts` の `reviewStateOf`）。
     期限の判定は「期限」と「レビュー期限」のうちまだ済んでいない早いほうで行う（同 `watchDueOf`）
   - `reviewer_id` はレビュー者（スキーマ v6）。ステータスが `review` でレビュー前のあいだは、
     そのタスクの持ち主を作業者（`assignee_id`）からレビュー者に切り替える（同 `activeOwnerIdOf`）。
