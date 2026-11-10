@@ -20,13 +20,25 @@ interface Props {
   onCreated?: (taskId: number) => void;
 }
 
+/** まとめて登録の入力から、空行を除いたタイトルの一覧を作る（1 行 = 1 タスク）。 */
+function parseTitles(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+}
+
 export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCreated }: Props) {
-  const { projects, members, createTask, includeArchived } = useStore();
+  const { projects, members, createTask, createTasksBulk, includeArchived } = useStore();
   const selectable = projects.filter((p) => includeArchived || !p.archived);
   const [projectId, setProjectId] = useState<number | null>(
     defaultProjectId ?? selectable[0]?.id ?? null,
   );
+  const [bulk, setBulk] = useState(false);
   const [title, setTitle] = useState('');
+  const [bulkTitles, setBulkTitles] = useState('');
+  const titles = parseTitles(bulkTitles);
+  const hasTitle = bulk ? titles.length > 0 : title.trim() !== '';
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<TaskStatus>(defaultStatus ?? 'todo');
   const [priority, setPriority] = useState<TaskPriority>('medium');
@@ -41,12 +53,10 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    const t = title.trim();
-    if (!t || projectId === null || busy) return;
+    if (!hasTitle || projectId === null || busy || linkInvalid) return;
     setBusy(true);
-    const input: CreateTaskInput = {
+    const common: Omit<CreateTaskInput, 'title'> = {
       projectId,
-      title: t,
       description,
       status,
       priority,
@@ -58,7 +68,13 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
       link: link.trim() || null,
       tagIds,
     };
-    const created = await createTask(input);
+    if (bulk) {
+      const created = await createTasksBulk({ ...common, titles });
+      setBusy(false);
+      if (created) onClose();
+      return;
+    }
+    const created = await createTask({ ...common, title: title.trim() });
     setBusy(false);
     if (created) {
       onCreated?.(created.id);
@@ -68,7 +84,7 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
 
   return (
     <Modal
-      title="タスクを追加"
+      title={bulk ? 'タスクをまとめて追加' : 'タスクを追加'}
       onClose={onClose}
       width={560}
       footer={
@@ -80,25 +96,56 @@ export function TaskCreateModal({ defaultProjectId, defaultStatus, onClose, onCr
             type="button"
             className="btn btn-primary"
             onClick={submit}
-            disabled={!title.trim() || projectId === null || busy || linkInvalid}
+            disabled={!hasTitle || projectId === null || busy || linkInvalid}
           >
-            作成
+            {bulk && titles.length > 0 ? `${titles.length} 件作成` : '作成'}
           </button>
         </>
       }
     >
       <div className="field">
-        <label htmlFor="t-title">タイトル</label>
-        <input
-          id="t-title"
-          value={title}
-          placeholder="やることを入力"
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit();
-          }}
-        />
+        <div className="view-switch" role="group" aria-label="登録方法">
+          <button type="button" className={bulk ? '' : 'active'} onClick={() => setBulk(false)}>
+            1 件ずつ
+          </button>
+          <button type="button" className={bulk ? 'active' : ''} onClick={() => setBulk(true)}>
+            まとめて登録
+          </button>
+        </div>
       </div>
+
+      {bulk ? (
+        <div className="field">
+          <label htmlFor="t-titles">タイトル（1 行に 1 タスク）</label>
+          <textarea
+            id="t-titles"
+            rows={8}
+            value={bulkTitles}
+            placeholder={'やることを 1 行ずつ入力\n例:\n画面設計\nAPI 実装\nテスト'}
+            onChange={(e) => setBulkTitles(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit();
+            }}
+          />
+          <p className="field-hint">
+            空行は無視します。下で選んだプロジェクト・ステータス・作業者などは全件に同じ値が入ります。
+            {titles.length > 0 ? `（${titles.length} 件）` : ''}
+          </p>
+        </div>
+      ) : (
+        <div className="field">
+          <label htmlFor="t-title">タイトル</label>
+          <input
+            id="t-title"
+            value={title}
+            placeholder="やることを入力"
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit();
+            }}
+          />
+        </div>
+      )}
 
       <div className="field-row">
         <div className="field">

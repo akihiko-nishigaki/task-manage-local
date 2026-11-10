@@ -56,6 +56,7 @@
 | PATCH/DELETE | `/api/tags/:id` | 更新 / 削除 |
 | GET | `/api/tasks` | 一覧。クエリ: `projectId, status, assigneeId, tagId, priority, q, dueBefore, dueAfter, includeDone, includeArchived, archivedOnly` |
 | POST | `/api/tasks` | 作成 `{ projectId, title, description?, status?, priority?, assigneeId?, dueDate?, tagIds? }` |
+| POST | `/api/tasks/bulk` | 一括作成 `{ titles: string[], projectId, …（title 以外は POST /api/tasks と同じ・全件共通） }` → `{ count, tasks }` |
 | GET | `/api/tasks/:id` | 詳細（`comments` 付き） |
 | PATCH | `/api/tasks/:id` | 部分更新（`tagIds` 含む） |
 | DELETE | `/api/tasks/:id` | 削除 |

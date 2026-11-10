@@ -2,6 +2,8 @@
 import type {
   ArchiveResult,
   ArchiveTasksInput,
+  BulkCreateTasksInput,
+  BulkCreateTasksResult,
   Comment,
   CreateCommentInput,
   CreateMemberInput,
@@ -199,6 +201,8 @@ export const api = {
     ),
   getTask: (id: number) => request<TaskDetail>('GET', `/tasks/${id}`),
   createTask: (input: CreateTaskInput) => request<Task>('POST', '/tasks', { body: input }),
+  createTasksBulk: (input: BulkCreateTasksInput) =>
+    request<BulkCreateTasksResult>('POST', '/tasks/bulk', { body: input }),
   updateTask: (id: number, input: UpdateTaskInput) =>
     request<Task>('PATCH', `/tasks/${id}`, { body: input }),
   deleteTask: (id: number) => request<void>('DELETE', `/tasks/${id}`),

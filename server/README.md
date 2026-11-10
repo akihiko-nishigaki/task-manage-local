@@ -62,6 +62,8 @@ npm run typecheck -w server  # 型検査のみ
   `PATCH` / `reorder` で完了以外のステータスへ戻した場合も自動でアーカイブ解除される。
 - `POST /api/tasks` の `position` は同一プロジェクト・同一ステータス内の最大値 + 1。
   ステータスが `done` になると `completedAt` が入り、`done` から外れると `null` に戻る。
+- `POST /api/tasks/bulk` は `titles`（1〜200 件）ごとにタスクを作り、`title` 以外の項目は全件共通。
+  1 件でも不正なら 400 で全体をロールバックする。応答は `201 { count, tasks }`（`tasks` は `titles` の順）。
 - `POST /api/tasks/reorder` は 1 トランザクションで更新し、更新後のタスク配列を返す。
 - `POST /api/import` は `{ mode: 'replace' | 'merge', data: ExportData }`。`replace` は全削除して id ごと復元、
   `merge` は新しい id を採番して参照を張り替える（同名タグは既存を再利用）。応答は

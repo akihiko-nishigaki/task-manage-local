@@ -221,6 +221,16 @@ export interface CreateTaskInput {
   reviewerId?: number | null;
 }
 
+/** 一括作成: タイトルだけ複数指定し、ほかの項目は全件共通。 */
+export interface BulkCreateTasksInput extends Omit<CreateTaskInput, 'title'> {
+  titles: string[];
+}
+
+export interface BulkCreateTasksResult {
+  count: number;
+  tasks: Task[];
+}
+
 export interface UpdateTaskInput {
   projectId?: number;
   title?: string;

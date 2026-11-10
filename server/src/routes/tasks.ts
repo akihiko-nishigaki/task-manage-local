@@ -1,7 +1,15 @@
 // /api/tasks
 import { Router } from 'express';
 import type { SQLInputValue } from 'node:sqlite';
-import type { ArchiveResult, Task, TaskDetail, TaskStatus } from '../../../shared/types.js';
+import type {
+  ArchiveResult,
+  BulkCreateTasksResult,
+  Task,
+  TaskChannel,
+  TaskDetail,
+  TaskPriority,
+  TaskStatus,
+} from '../../../shared/types.js';
 import type { Db } from '../db.js';
 import { tx } from '../db.js';
 import { notFoundError, validationError } from '../errors.js';
@@ -81,6 +89,90 @@ function completedAtFor(previous: TaskStatus, next: TaskStatus, current: string 
 function toTasks(db: Db, rows: Row[]): Task[] {
   const tagMap = tagIdsByTask(db, rows.map((row) => Number(row['id'])));
   return rows.map((row) => toTask(row, tagMap.get(Number(row['id'])) ?? []));
+}
+
+const MAX_BULK_TASKS = 200;
+
+/** タスク作成時のタイトル以外の項目。単体作成と一括作成で共通。 */
+interface CreateFields {
+  projectId: number;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assigneeId: number | null;
+  dueDate: string | null;
+  tagIds: number[];
+  channel: TaskChannel | null;
+  link: string | null;
+  reviewDue: string | null;
+  reviewed: boolean;
+  reviewerId: number | null;
+}
+
+function parseCreateFields(db: Db, body: Record<string, unknown>): CreateFields {
+  const projectId = requireId(body['projectId'], 'projectId');
+  ensureProject(db, projectId);
+  const description = has(body, 'description') ? requireText(body['description'], 'description') : '';
+  const status = has(body, 'status') ? requireStatus(body['status']) : 'todo';
+  const priority = has(body, 'priority') ? requirePriority(body['priority']) : 'medium';
+  const assigneeId = has(body, 'assigneeId') ? requireNullableId(body['assigneeId'], 'assigneeId') : null;
+  ensureMember(db, assigneeId);
+  const dueDate = has(body, 'dueDate') ? requireNullableDate(body['dueDate']) : null;
+  const tagIds = has(body, 'tagIds') ? requireIdArray(body['tagIds'], 'tagIds') : [];
+  ensureTags(db, tagIds);
+  const channel = has(body, 'channel') ? requireNullableChannel(body['channel']) : null;
+  const link = has(body, 'link') ? requireNullableLink(body['link']) : null;
+  const reviewDue = has(body, 'reviewDue') ? requireNullableDate(body['reviewDue'], 'reviewDue') : null;
+  const reviewed = has(body, 'reviewed') ? requireBoolean(body['reviewed'], 'reviewed') : false;
+  const reviewerId = has(body, 'reviewerId') ? requireNullableId(body['reviewerId'], 'reviewerId') : null;
+  ensureMember(db, reviewerId);
+  return {
+    projectId,
+    description,
+    status,
+    priority,
+    assigneeId,
+    dueDate,
+    tagIds,
+    channel,
+    link,
+    reviewDue,
+    reviewed,
+    reviewerId,
+  };
+}
+
+/** 1 件挿入して id を返す。トランザクション内で呼ぶこと。 */
+function insertTask(db: Db, f: CreateFields, title: string, now: string): number {
+  const info = db
+    .prepare(
+      `INSERT INTO tasks
+         (project_id, title, description, status, priority, assignee_id, due_date, position,
+          created_at, updated_at, completed_at, channel, link, review_due, reviewed, reviewed_at, reviewer_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      f.projectId,
+      title,
+      f.description,
+      f.status,
+      f.priority,
+      f.assigneeId,
+      f.dueDate,
+      nextPosition(db, f.projectId, f.status),
+      now,
+      now,
+      f.status === 'done' ? now : null,
+      f.channel,
+      f.link,
+      f.reviewDue,
+      sqlBool(f.reviewed),
+      f.reviewed ? now : null,
+      f.reviewerId,
+    );
+  const newId = Number(info.lastInsertRowid);
+  if (f.tagIds.length > 0) setTaskTags(db, newId, f.tagIds);
+  return newId;
 }
 
 export function tasksRouter(db: Db): Router {
@@ -255,57 +347,30 @@ export function tasksRouter(db: Db): Router {
 
   router.post('/tasks', (req, res) => {
     const body = asObject(req.body);
-    const projectId = requireId(body['projectId'], 'projectId');
-    ensureProject(db, projectId);
+    const fields = parseCreateFields(db, body);
     const title = requireName(body['title'], 'title');
-    const description = has(body, 'description') ? requireText(body['description'], 'description') : '';
-    const status = has(body, 'status') ? requireStatus(body['status']) : 'todo';
-    const priority = has(body, 'priority') ? requirePriority(body['priority']) : 'medium';
-    const assigneeId = has(body, 'assigneeId') ? requireNullableId(body['assigneeId'], 'assigneeId') : null;
-    ensureMember(db, assigneeId);
-    const dueDate = has(body, 'dueDate') ? requireNullableDate(body['dueDate']) : null;
-    const tagIds = has(body, 'tagIds') ? requireIdArray(body['tagIds'], 'tagIds') : [];
-    ensureTags(db, tagIds);
-    const channel = has(body, 'channel') ? requireNullableChannel(body['channel']) : null;
-    const link = has(body, 'link') ? requireNullableLink(body['link']) : null;
-    const reviewDue = has(body, 'reviewDue') ? requireNullableDate(body['reviewDue'], 'reviewDue') : null;
-    const reviewed = has(body, 'reviewed') ? requireBoolean(body['reviewed'], 'reviewed') : false;
-    const reviewerId = has(body, 'reviewerId') ? requireNullableId(body['reviewerId'], 'reviewerId') : null;
-    ensureMember(db, reviewerId);
+    const id = tx(db, () => insertTask(db, fields, title, nowIso()));
+    res.status(201).json(requireTask(db, id));
+  });
+
+  // タイトルだけ複数指定して、ほかの項目は共通の値でまとめて作成する。1 件でも不正なら全件作成しない。
+  router.post('/tasks/bulk', (req, res) => {
+    const body = asObject(req.body);
+    const fields = parseCreateFields(db, body);
+    const rawTitles = body['titles'];
+    if (!Array.isArray(rawTitles) || rawTitles.length === 0) {
+      throw validationError('titles は 1 件以上の配列である必要があります');
+    }
+    if (rawTitles.length > MAX_BULK_TASKS) {
+      throw validationError(`一度に作成できるタスクは ${MAX_BULK_TASKS} 件までです`);
+    }
+    const titles = rawTitles.map((raw, i) => requireName(raw, `titles[${i}]`));
 
     const now = nowIso();
-    const id = tx(db, () => {
-      const info = db
-        .prepare(
-          `INSERT INTO tasks
-             (project_id, title, description, status, priority, assignee_id, due_date, position,
-              created_at, updated_at, completed_at, channel, link, review_due, reviewed, reviewed_at, reviewer_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          projectId,
-          title,
-          description,
-          status,
-          priority,
-          assigneeId,
-          dueDate,
-          nextPosition(db, projectId, status),
-          now,
-          now,
-          status === 'done' ? now : null,
-          channel,
-          link,
-          reviewDue,
-          sqlBool(reviewed),
-          reviewed ? now : null,
-          reviewerId,
-        );
-      const newId = Number(info.lastInsertRowid);
-      if (tagIds.length > 0) setTaskTags(db, newId, tagIds);
-      return newId;
-    });
-    res.status(201).json(requireTask(db, id));
+    const ids = tx(db, () => titles.map((title) => insertTask(db, fields, title, now)));
+    const tasks = ids.map((id) => requireTask(db, id));
+    const result: BulkCreateTasksResult = { count: tasks.length, tasks };
+    res.status(201).json(result);
   });
 
   router.get('/tasks/:id', (req, res) => {

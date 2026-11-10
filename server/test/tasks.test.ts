@@ -181,3 +181,56 @@ test('タスク削除でタグ関連とコメントも消える', async (t) => {
   assert.equal(ctx.db.prepare('SELECT COUNT(*) AS n FROM comments').get()?.['n'], 0);
   assert.equal((await ctx.del(`/api/tasks/${task.data.id}`)).status, 404);
 });
+
+test('一括作成はタイトルごとに共通の項目でタスクを作る', async (t) => {
+  const ctx = await createContext();
+  t.after(() => ctx.close());
+  const { projectId, memberId, tagId } = await seed(ctx);
+  await ctx.post('/api/tasks', { projectId, title: '既存', status: 'in_progress' });
+
+  const res = await ctx.post('/api/tasks/bulk', {
+    projectId,
+    titles: ['画面設計', 'API 実装', 'テスト'],
+    status: 'in_progress',
+    priority: 'high',
+    assigneeId: memberId,
+    dueDate: '2026-12-01',
+    tagIds: [tagId],
+  });
+  assert.equal(res.status, 201);
+  assert.equal(res.data.count, 3);
+  assert.deepEqual(
+    res.data.tasks.map((task: { title: string }) => task.title),
+    ['画面設計', 'API 実装', 'テスト'],
+  );
+  // 既存の末尾から順に採番される
+  assert.deepEqual(
+    res.data.tasks.map((task: { position: number }) => task.position),
+    [2, 3, 4],
+  );
+  for (const task of res.data.tasks) {
+    assert.equal(task.projectId, projectId);
+    assert.equal(task.status, 'in_progress');
+    assert.equal(task.priority, 'high');
+    assert.equal(task.assigneeId, memberId);
+    assert.equal(task.dueDate, '2026-12-01');
+    assert.deepEqual(task.tagIds, [tagId]);
+  }
+});
+
+test('一括作成は 1 件でも不正なら全件作成しない', async (t) => {
+  const ctx = await createContext();
+  t.after(() => ctx.close());
+  const { projectId } = await seed(ctx);
+
+  const empty = await ctx.post('/api/tasks/bulk', { projectId, titles: [] });
+  assert.equal(empty.status, 400);
+
+  const invalid = await ctx.post('/api/tasks/bulk', { projectId, titles: ['正しい', '   '] });
+  assert.equal(invalid.status, 400);
+  const list = await ctx.get(`/api/tasks?projectId=${projectId}`);
+  assert.equal(list.data.length, 0);
+
+  const badMember = await ctx.post('/api/tasks/bulk', { projectId, titles: ['a'], assigneeId: 9999 });
+  assert.notEqual(badMember.status, 201);
+});

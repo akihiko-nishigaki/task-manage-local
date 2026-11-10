@@ -11,6 +11,7 @@ import {
 } from 'react';
 import type {
   ArchiveTasksInput,
+  BulkCreateTasksInput,
   Comment,
   CreateCommentInput,
   CreateProjectInput,
@@ -128,6 +129,8 @@ interface StoreValue {
   deleteTag: (id: number) => Promise<void>;
 
   createTask: (input: CreateTaskInput) => Promise<Task | null>;
+  /** タイトルだけ複数指定して、ほかの項目は共通でまとめて作成する。戻り値は作成したタスク（失敗時 null）。 */
+  createTasksBulk: (input: BulkCreateTasksInput) => Promise<Task[] | null>;
   updateTask: (id: number, input: UpdateTaskInput) => Promise<void>;
   deleteTask: (id: number) => Promise<void>;
   reorderTasks: (items: { id: number; status: Task['status']; position: number }[]) => Promise<void>;
@@ -506,6 +509,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [pushToast, reportError],
   );
 
+  const createTasksBulk = useCallback(
+    async (input: BulkCreateTasksInput) => {
+      try {
+        const result = await api.createTasksBulk(input);
+        setTasks((prev) => [...prev, ...result.tasks]);
+        void api.listProjects(true).then(setProjects).catch(() => undefined);
+        pushToast('success', `${result.count} 件のタスクを作成しました。`);
+        return result.tasks;
+      } catch (err) {
+        reportError(err, 'タスクの一括作成に失敗しました。');
+        return null;
+      }
+    },
+    [pushToast, reportError],
+  );
+
   const updateTask = useCallback(
     async (id: number, input: UpdateTaskInput) => {
       const before = tasks;
@@ -700,6 +719,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateTag,
     deleteTag,
     createTask,
+    createTasksBulk,
     updateTask,
     deleteTask,
     reorderTasks,
