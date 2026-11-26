@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { activeOwnerIdOf } from '@shared/types';
+import { isRelatedOwner } from '@shared/types';
 import { useStore } from '../store';
 import { navigate, sameRoute, type Route } from '../router';
 import {
@@ -56,7 +56,7 @@ export function Sidebar({ route, onNewProject }: Props) {
       t.status !== 'done' &&
       t.status !== 'backlog' &&
       currentUserId !== null &&
-      activeOwnerIdOf(t) === currentUserId,
+      isRelatedOwner(t, currentUserId),
   ).length;
 
   const visibleProjects = projects.filter((p) => includeArchived || !p.archived);

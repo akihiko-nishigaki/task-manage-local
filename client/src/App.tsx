@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Project, Task } from '@shared/types';
-import { activeOwnerIdOf } from '@shared/types';
+import { isRelatedOwner } from '@shared/types';
 import { useStore } from './store';
 import { navigate, useRoute } from './router';
 import { Sidebar } from './components/Sidebar';
@@ -80,7 +80,7 @@ export function App() {
       list = list.filter(
         (t) =>
           currentUserId !== null &&
-          activeOwnerIdOf(t) === currentUserId &&
+          isRelatedOwner(t, currentUserId) &&
           visibleProjectIds.has(t.projectId),
       );
     else list = list.filter((t) => visibleProjectIds.has(t.projectId));

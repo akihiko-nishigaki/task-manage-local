@@ -4,6 +4,8 @@ import test from 'node:test';
 import {
   activeOwnerIdOf,
   isAwaitingReview,
+  isRelatedOwner,
+  relatedOwnerIdsOf,
   isSettled,
   ownerIsReviewer,
   REVIEW_CHECK_LABEL,
@@ -275,6 +277,24 @@ test('実質の担当は、レビュー待ちならレビュー者・それ以�
 
   // 作業者が未割当でも、レビュー待ちならレビュー者が持つ
   assert.equal(activeOwnerIdOf({ assigneeId: null, reviewerId: 2, reviewed: false, status: 'review' }), 2);
+});
+
+test('関係者（絞り込みに使う担当）は作業者とレビュー者の両方', () => {
+  const base = { assigneeId: 1, reviewerId: 2 };
+
+  // レビュー待ちでも作業者の手元から消えない
+  assert.deepEqual(relatedOwnerIdsOf(base), [1, 2]);
+  assert.equal(isRelatedOwner(base, 1), true);
+  assert.equal(isRelatedOwner(base, 2), true);
+  assert.equal(isRelatedOwner(base, 3), false);
+
+  // 片方だけ・未設定
+  assert.deepEqual(relatedOwnerIdsOf({ assigneeId: 1, reviewerId: null }), [1]);
+  assert.deepEqual(relatedOwnerIdsOf({ assigneeId: null, reviewerId: 2 }), [2]);
+  assert.deepEqual(relatedOwnerIdsOf({ assigneeId: null, reviewerId: null }), []);
+
+  // 作業者とレビュー者が同じ人なら 1 件だけ（件数が二重にならない）
+  assert.deepEqual(relatedOwnerIdsOf({ assigneeId: 1, reviewerId: 1 }), [1]);
 });
 
 test('レビューの段階はチェックの ON / OFF だけで決まる', () => {

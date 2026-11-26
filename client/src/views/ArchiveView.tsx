@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Task } from '@shared/types';
-import { activeOwnerIdOf, ownerIsReviewer } from '@shared/types';
+import { activeOwnerIdOf, ownerIsReviewer, relatedOwnerIdsOf } from '@shared/types';
 import { ApiError, api } from '../api';
 import { useStore } from '../store';
 import { Assignee, TagList } from '../components/Badges';
@@ -45,9 +45,9 @@ export function ArchiveView() {
     const needle = q.trim().toLowerCase();
     return items.filter((t) => {
       if (fProject && t.projectId !== Number(fProject)) return false;
-      const ownerId = activeOwnerIdOf(t);
-      if (fAssignee === 'none' && ownerId !== null) return false;
-      if (fAssignee && fAssignee !== 'none' && ownerId !== Number(fAssignee)) return false;
+      const ownerIds = relatedOwnerIdsOf(t);
+      if (fAssignee === 'none' && ownerIds.length > 0) return false;
+      if (fAssignee && fAssignee !== 'none' && !ownerIds.includes(Number(fAssignee))) return false;
       if (needle && !t.title.toLowerCase().includes(needle) && !t.description.toLowerCase().includes(needle)) {
         return false;
       }

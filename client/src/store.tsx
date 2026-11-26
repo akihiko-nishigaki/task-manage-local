@@ -29,7 +29,7 @@ import type {
   UpdateTaskInput,
   WorkspaceInfo,
 } from '@shared/types';
-import { activeOwnerIdOf } from '@shared/types';
+import { relatedOwnerIdsOf } from '@shared/types';
 import { ApiError, api, getActiveWorkspaceId, setActiveWorkspaceId } from './api';
 
 /** 「実質の担当」の判定に必要な項目だけ（Task をまるごと渡さなくてよいように） */
@@ -213,12 +213,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // 「実質の担当」で引く。レビュー待ち（ステータスがレビュー・レビュー前）のタスクはレビュー者のもの、
-  // それ以外は作業者のものとして扱う（shared/types.ts の activeOwnerIdOf）
+  // 関係者（作業者とレビュー者の両方）で引く。レビュー待ちの間もタスクが作業者の手元から
+  // 消えないようにする（shared/types.ts の relatedOwnerIdsOf）
   const inUserScope = useCallback(
     (task: TaskOwnerFields) => {
-      const ownerId = activeOwnerIdOf(task);
-      return unassignedOnly ? ownerId === null : currentUserId === null || ownerId === currentUserId;
+      const ownerIds = relatedOwnerIdsOf(task);
+      return unassignedOnly
+        ? ownerIds.length === 0
+        : currentUserId === null || ownerIds.includes(currentUserId);
     },
     [unassignedOnly, currentUserId],
   );

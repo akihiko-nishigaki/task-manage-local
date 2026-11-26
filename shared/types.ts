@@ -155,6 +155,28 @@ export function activeOwnerIdOf(
   return isAwaitingReview(task) && task.reviewerId !== null ? task.reviewerId : task.assigneeId;
 }
 
+/**
+ * そのタスクに関わっている人（作業者とレビュー者）。
+ * レビュー待ちでも作業者の手元から消えないよう、マイタスク・「現在のユーザー」・担当の絞り込みはこれで引く。
+ * 表示上「いまボールを持っている人」が要るところだけ activeOwnerIdOf を使う。
+ */
+export function relatedOwnerIdsOf(
+  task: Pick<Task, 'assigneeId' | 'reviewerId'>,
+): number[] {
+  const ids: number[] = [];
+  if (task.assigneeId !== null) ids.push(task.assigneeId);
+  if (task.reviewerId !== null && task.reviewerId !== task.assigneeId) ids.push(task.reviewerId);
+  return ids;
+}
+
+/** その人が関係者か（作業者またはレビュー者） */
+export function isRelatedOwner(
+  task: Pick<Task, 'assigneeId' | 'reviewerId'>,
+  memberId: number,
+): boolean {
+  return relatedOwnerIdsOf(task).includes(memberId);
+}
+
 /** 実質の担当がレビュー者か（一覧の「R」の印に使う） */
 export function ownerIsReviewer(
   task: Pick<Task, 'status' | 'reviewed' | 'reviewerId'>,

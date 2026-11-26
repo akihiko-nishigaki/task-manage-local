@@ -1,9 +1,9 @@
 // タスクの絞り込みバー。リスト表示とカンバン表示で同じ条件を共有する。
 import type { Task, TaskChannel, TaskPriority, TaskStatus } from '@shared/types';
 import {
-  activeOwnerIdOf,
   CHANNEL_LABELS,
   PRIORITY_LABELS,
+  relatedOwnerIdsOf,
   STATUS_LABELS,
   TASK_CHANNELS,
   TASK_PRIORITIES,
@@ -48,10 +48,10 @@ export function applyTaskFilter(tasks: Task[], f: TaskFilter, useStatus = true):
       if (f.status && t.status !== f.status) return false;
     }
     if (f.priority && t.priority !== f.priority) return false;
-    // 担当は「実質の担当」で引く（レビュー待ちはレビュー者のタスク）
-    const ownerId = activeOwnerIdOf(t);
-    if (f.assignee === 'none' && ownerId !== null) return false;
-    if (f.assignee && f.assignee !== 'none' && ownerId !== Number(f.assignee)) return false;
+    // 担当は作業者とレビュー者の両方で引く（レビュー待ちでも作業者で絞り込める）
+    const ownerIds = relatedOwnerIdsOf(t);
+    if (f.assignee === 'none' && ownerIds.length > 0) return false;
+    if (f.assignee && f.assignee !== 'none' && !ownerIds.includes(Number(f.assignee))) return false;
     if (f.tag && !t.tagIds.includes(Number(f.tag))) return false;
     if (f.channel && t.channel !== f.channel) return false;
     return true;
