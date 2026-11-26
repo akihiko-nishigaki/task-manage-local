@@ -1,22 +1,20 @@
 import { useMemo, useState, type DragEvent } from 'react';
 import type { Task, TaskPriority, TaskStatus } from '@shared/types';
 import {
-  activeOwnerIdOf,
   isSettled,
-  ownerIsReviewer,
   STATUS_LABELS,
   TASK_STATUSES,
   watchDueOf,
 } from '@shared/types';
 import { useStore } from '../store';
 import {
-  Assignee,
   ChannelBadge,
   PriorityBadge,
   ReviewBadge,
   ReviewDue,
   StatusBadge,
   TaskLink,
+  TaskOwners,
 } from '../components/Badges';
 import { IconAlert, IconBoard, IconCalendar, IconFlag } from '../components/Icons';
 import { describeDue, formatDueShort, isOverdue } from '../utils/date';
@@ -86,7 +84,7 @@ function MiniList({
   onDragEnd?: () => void;
   draggingId?: number | null;
 }) {
-  const { memberById, projectById } = useStore();
+  const { projectById } = useStore();
   const toggleReviewed = useToggleReviewed();
   if (tasks.length === 0) return <p className="muted card-empty">{empty}</p>;
   return (
@@ -113,7 +111,8 @@ function MiniList({
                       {project.name}
                     </span>
                   ) : null}
-                  <Assignee member={memberById(activeOwnerIdOf(t))} reviewer={ownerIsReviewer(t)} />
+                  {/* 作業者とレビュー者の両方を出す（レビュー中も誰の案件か分かるように） */}
+                  <TaskOwners task={t} inline compact />
                 </span>
               </span>
               <span className="mini-right">
@@ -139,7 +138,7 @@ function MiniList({
 const PRIORITY_FOCUS: TaskPriority[] = ['urgent', 'high'];
 
 export function Dashboard({ tasks, onOpenTask }: Props) {
-  const { memberById, projectById, projects, updateTask } = useStore();
+  const { projectById, projects, updateTask } = useStore();
   const toggleReviewed = useToggleReviewed();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropStatus, setDropStatus] = useState<TaskStatus | null>(null);
@@ -361,7 +360,6 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
                 <ul className="status-cards">
                   {shown.map((t) => {
                     const project = projectById(t.projectId);
-                    const member = memberById(activeOwnerIdOf(t));
                     return (
                       <li key={t.id}>
                         <div
@@ -392,7 +390,7 @@ export function Dashboard({ tasks, onOpenTask }: Props) {
                             <ReviewBadge task={t} />
                             <ChannelBadge channel={t.channel} />
                             <TaskLink link={t.link} compact />
-                            {member ? <Assignee member={member} reviewer={ownerIsReviewer(t)} /> : null}
+                            <TaskOwners task={t} inline hideWhenEmpty />
                             {t.dueDate ? (
                               <span
                                 className={

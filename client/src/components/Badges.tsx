@@ -1,15 +1,60 @@
 import type { Member, Tag, Task, TaskChannel, TaskPriority, TaskStatus } from '@shared/types';
 import {
+  activeOwnerIdOf,
   CHANNEL_LABELS,
   isSafeLink,
+  ownerIsReviewer,
   PRIORITY_LABELS,
   REVIEW_CHECK_LABEL,
   REVIEW_STATE_LABELS,
   reviewStateOf,
   STATUS_LABELS,
 } from '@shared/types';
+import { useStore } from '../store';
 import { IconLink } from './Icons';
 import { formatDueShort, isOverdue, isToday } from '../utils/date';
+
+/**
+ * 作業者とレビュー者を並べて出す。いまボールを持っている側をはっきり、もう一方を薄く表示する。
+ * レビュー中でもタスクが誰の案件か分かるよう、一覧・ダッシュボード・カンバンで同じ出し方にする。
+ */
+export function TaskOwners({
+  task,
+  inline = false,
+  compact = false,
+  hideWhenEmpty = false,
+}: {
+  task: Pick<Task, 'status' | 'reviewed' | 'assigneeId' | 'reviewerId'>;
+  /** カードや行の中に横並びで出す（表のセルでは縦並び） */
+  inline?: boolean;
+  /** とくに幅の狭い行では両方ともアバターだけにする（名前はマウスを乗せると出る） */
+  compact?: boolean;
+  /** 作業者もレビュー者もいないときは何も出さない（カードの情報を増やしすぎない） */
+  hideWhenEmpty?: boolean;
+}) {
+  const { memberById } = useStore();
+  if (hideWhenEmpty && task.assigneeId === null && task.reviewerId === null) return null;
+  const assigneeDim = task.assigneeId !== null && activeOwnerIdOf(task) !== task.assigneeId;
+  const reviewerDim = !ownerIsReviewer(task);
+  return (
+    <span className={`owner-cell${inline ? ' owner-cell-inline' : ''}`}>
+      <Assignee
+        member={memberById(task.assigneeId)}
+        dim={assigneeDim}
+        // 幅の狭いカード・行では、持っていない側はアバターだけにしてタイトルを潰さない
+        nameHidden={compact || (inline && assigneeDim)}
+      />
+      {task.reviewerId !== null ? (
+        <Assignee
+          member={memberById(task.reviewerId)}
+          reviewer
+          dim={reviewerDim}
+          nameHidden={compact || (inline && reviewerDim)}
+        />
+      ) : null}
+    </span>
+  );
+}
 
 export function PriorityBadge({ priority }: { priority: TaskPriority }) {
   return <span className={`badge prio prio-${priority}`}>{PRIORITY_LABELS[priority]}</span>;
@@ -52,24 +97,34 @@ export function Assignee({
   member,
   reviewer = false,
   dim = false,
+  nameHidden = false,
 }: {
   member: Member | null;
   reviewer?: boolean;
   /** いまボールを持っていない側（作業者・レビュー者を並べて出すときに控えめにする） */
   dim?: boolean;
+  /** 幅が狭いところでは名前を省いてアバターだけにする（名前はマウスを乗せると出る） */
+  nameHidden?: boolean;
 }) {
-  if (!member) return <span className="muted">{reviewer ? 'レビュー者未定' : '未割当'}</span>;
+  if (!member) {
+    if (nameHidden) return null;
+    return <span className="muted">{reviewer ? 'レビュー者未定' : '未割当'}</span>;
+  }
+  const label = reviewer ? `レビュー者: ${member.name}` : `作業者: ${member.name}`;
   return (
-    <span className={`assignee${reviewer ? ' assignee-reviewer' : ''}${dim ? ' assignee-dim' : ''}`}>
+    <span
+      className={`assignee${reviewer ? ' assignee-reviewer' : ''}${dim ? ' assignee-dim' : ''}`}
+      title={nameHidden ? label : undefined}
+    >
       {reviewer ? (
-        <span className="owner-mark" title="レビュー待ち（レビュー者のタスク）">
+        <span className="owner-mark" title={nameHidden ? undefined : 'レビュー者'}>
           R
         </span>
       ) : null}
       <span className="avatar" aria-hidden="true">
         {member.name.slice(0, 1)}
       </span>
-      <span className="assignee-name">{member.name}</span>
+      {nameHidden ? <span className="sr-only">{label}</span> : <span className="assignee-name">{member.name}</span>}
     </span>
   );
 }

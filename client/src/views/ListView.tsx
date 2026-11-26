@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
 import type { Task, TaskPriority, TaskStatus } from '@shared/types';
-import { activeOwnerIdOf, ownerIsReviewer, STATUS_LABELS, TASK_STATUSES } from '@shared/types';
+import { activeOwnerIdOf, STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
 import {
-  Assignee,
   ChannelBadge,
   DueDate,
   PriorityBadge,
   ReviewCheck,
   TagList,
   TaskLink,
+  TaskOwners,
 } from '../components/Badges';
 import { useToggleReviewed } from '../utils/review';
 
@@ -139,19 +139,7 @@ export function ListView({ tasks, onOpenTask }: Props) {
                   </td>
                   <td>
                     {/* 作業者とレビュー者の両方を出し、いまボールを持っているほうをはっきり見せる */}
-                    <span className="owner-cell">
-                      <Assignee
-                        member={memberById(t.assigneeId)}
-                        dim={t.assigneeId !== null && activeOwnerIdOf(t) !== t.assigneeId}
-                      />
-                      {t.reviewerId !== null ? (
-                        <Assignee
-                          member={memberById(t.reviewerId)}
-                          reviewer
-                          dim={!ownerIsReviewer(t)}
-                        />
-                      ) : null}
-                    </span>
+                    <TaskOwners task={t} />
                   </td>
                   <td>
                     <DueDate due={t.dueDate} done={t.status === 'done' || t.status === 'backlog'} />

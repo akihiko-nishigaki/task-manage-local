@@ -1,15 +1,15 @@
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { Task, TaskStatus } from '@shared/types';
-import { activeOwnerIdOf, ownerIsReviewer, STATUS_LABELS, TASK_STATUSES } from '@shared/types';
+import { STATUS_LABELS, TASK_STATUSES } from '@shared/types';
 import { useStore } from '../store';
 import {
-  Assignee,
   ChannelBadge,
   PriorityBadge,
   ReviewBadge,
   ReviewDue,
   TagChip,
   TaskLink,
+  TaskOwners,
 } from '../components/Badges';
 import { IconArchive, IconPlus } from '../components/Icons';
 import { formatDueShort, isOverdue, isToday } from '../utils/date';
@@ -33,7 +33,7 @@ interface DropTarget {
 const DRAG_MIME = 'text/plain';
 
 export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone }: Props) {
-  const { memberById, tagById, reorderTasks, createTask, projectById } = useStore();
+  const { tagById, reorderTasks, createTask, projectById } = useStore();
   const toggleReviewed = useToggleReviewed();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
@@ -220,7 +220,8 @@ export function KanbanView({ tasks, onOpenTask, quickAddProjectId, onArchiveDone
                         <ReviewBadge task={t} />
                         <ChannelBadge channel={t.channel} />
                         <TaskLink link={t.link} compact />
-                        <Assignee member={memberById(activeOwnerIdOf(t))} reviewer={ownerIsReviewer(t)} />
+                        {/* 作業者とレビュー者の両方を出す（レビュー中も誰の案件か分かるように） */}
+                        <TaskOwners task={t} inline />
                         {t.dueDate ? (
                           <span
                             className={`due${overdue ? ' due-over' : ''}${
